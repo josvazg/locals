@@ -34,7 +34,7 @@ func rm(p *locals.Platform, localsDir, domain string) error {
 		return fmt.Errorf("failed to render the rm script: %w", err)
 	}
 	rmScript := &script{name: filepath.Join(localsDir, "rm.sh"), contents: rmCode}
-	if err := save(rmScript); err != nil {
+	if err := save(p, rmScript); err != nil {
 		return fmt.Errorf("failed to save the rm script: %w", err)
 	}
 	if dryrun {

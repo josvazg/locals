@@ -31,7 +31,7 @@ func off(p *locals.Platform, localsDir string) error {
 		return fmt.Errorf("failed to render the off script: %w", err)
 	}
 	offScript := &script{name: filepath.Join(localsDir, "off.sh"), contents: offScriptCode}
-	if err := save(offScript); err != nil {
+	if err := save(p, offScript); err != nil {
 		return fmt.Errorf("failed to save off.sh script: %w", err)
 	}
 	if dryrun {

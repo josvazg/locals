@@ -35,7 +35,7 @@ func on(p *locals.Platform, localsDir string, dryrun bool) error {
 		return fmt.Errorf("failed to render the on script: %w", err)
 	}
 	onScript := &script{name: filepath.Join(localsDir, "on.sh"), contents: onScriptCode}
-	if err := save(onScript); err != nil {
+	if err := save(p, onScript); err != nil {
 		return fmt.Errorf("failed to save on.sh script: %w", err)
 	}
 	if dryrun {

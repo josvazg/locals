@@ -89,7 +89,6 @@ func Run(p *locals.Platform, args []string) error {
 		off,
 		add,
 		rm,
-		listCmd(p, cfgDir),
 		dnsCmd(ctx),
 		webCmd(ctx, cfgDir),
 		statusCmd(p, cfgDir),

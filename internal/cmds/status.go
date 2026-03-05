@@ -13,18 +13,18 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func statusCmd(_ *locals.Platform, localsDir string) *cobra.Command {
+func statusCmd(p *locals.Platform, localsDir string) *cobra.Command {
 	return &cobra.Command{
 		Use:   "status",
 		Short: "Show locals status",
 		Args:  cobra.ExactArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return status(localsDir)
+			return status(p, localsDir)
 		},
 	}
 }
 
-func status(configDir string) error {
+func status(p *locals.Platform, configDir string) error {
 	fmt.Println("----------- 📍 Locals Status -----------")
 
 	dnsMode := "🔓 INACTIVE"

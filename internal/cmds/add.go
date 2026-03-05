@@ -35,7 +35,7 @@ func add(p *locals.Platform, localsDir, domain, targetURL string) error {
 		return fmt.Errorf("failed to render the add script: %w", err)
 	}
 	addScript := &script{name: filepath.Join(localsDir, "add.sh"), contents: addCode}
-	if err := save(addScript); err != nil {
+	if err := save(p, addScript); err != nil {
 		return fmt.Errorf("failed to save the add script: %w", err)
 	}
 	if dryrun {
