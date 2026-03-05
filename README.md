@@ -29,7 +29,7 @@ Note the original `/etc/resolv.conf` is never written to, only bind mounted on t
 ### Add a Route
 
 ```shell
-locals add myservice.locals localhost:9876
+locals add registry.locals localhost:5000
 ```
 
 Creates a JSON web config in `~/.config/locals/web/myservice.json`:
@@ -44,7 +44,7 @@ locals rm myservice.locals
 
 Removes the JSON web config at `~/.config/locals/web/myservice.json`:
 
-After this `https://myservice.locals` is no longer available.
+After this `https://registry.locals` is no longer available.
 
 ### Enable CLI Support
 
