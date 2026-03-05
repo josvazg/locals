@@ -2,12 +2,14 @@ package render
 
 import (
 	"embed"
+	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
-//go:embed testdata/*.sh
+//go:embed testdata/*/*.sh
 var testDataFS embed.FS
 
 func TestRenderScripts(t *testing.T) {
@@ -22,10 +24,10 @@ func TestRenderScripts(t *testing.T) {
 		renderFn   func(State) ([]byte, error)
 		goldenFile string
 	}{
-		{"On Script DNSMasq", On, "testdata/on.sh"},
-		{"Off Script DNSMasq", Off, "testdata/off.sh"},
-		{"Add Script", Add, "testdata/add.sh"},
-		{"Remove Script", Remove, "testdata/rm.sh"},
+		{"On Script DNSMasq", On, "on.sh"},
+		{"Off Script DNSMasq", Off, "off.sh"},
+		{"Add Script", Add, "add.sh"},
+		{"Remove Script", Remove, "rm.sh"},
 	}
 
 	for _, tt := range tests {
@@ -35,7 +37,8 @@ func TestRenderScripts(t *testing.T) {
 				t.Fatalf("render error: %v", err)
 			}
 
-			want, err := testDataFS.ReadFile(tt.goldenFile)
+			goldenFile := filepath.Join("testdata", runtime.GOOS, tt.goldenFile)
+			want, err := testDataFS.ReadFile(goldenFile)
 			if err != nil {
 				t.Fatalf("could not read golden file %s: %v", tt.goldenFile, err)
 			}

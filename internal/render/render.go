@@ -5,10 +5,11 @@ import (
 	"embed"
 	"fmt"
 	"path/filepath"
+	"runtime"
 	"text/template"
 )
 
-//go:embed templates/*.tmpl
+//go:embed templates/*/*.tmpl
 var templateFS embed.FS
 
 // State represents the variables required to render all scripts.
@@ -19,7 +20,8 @@ type State struct {
 }
 
 func renderTemplate(s State, name string) ([]byte, error) {
-	tmpl, err := template.ParseFS(templateFS, filepath.Join("templates/", name))
+	templateDir := filepath.Join("templates", runtime.GOOS)
+	tmpl, err := template.ParseFS(templateFS, filepath.Join(templateDir, name))
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse template %s: %w", name, err)
 	}
