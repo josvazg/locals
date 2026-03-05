@@ -2,11 +2,12 @@ package cmds
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"fmt"
+	"locals/api/locals"
 	"log"
 	"net"
-	"os"
 	"strings"
 
 	"github.com/miekg/dns"
@@ -23,17 +24,17 @@ const (
 
 var domainSuffix = fmt.Sprintf(".%s.", domain)
 
-func dnsCmd(ctx context.Context) *cobra.Command {
+func dnsCmd(ctx context.Context, p *locals.Platform) *cobra.Command {
 	return &cobra.Command{
-		Use: "dns address [fallbacks]",
+		Use:   "dns address [fallbacks]",
 		Short: "Run the locals DNS service",
 		Long: "Runs a simple local DNS service, including other servers as fallback.\n" +
 			"E.g:\n" +
 			"$ dns 127.1.2.3 1.1.1.1,4.4.4.4,8.8.8.8,9.9.9.9",
-		Args:  cobra.RangeArgs(1, 2),
+		Args: cobra.RangeArgs(1, 2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			listen := args[0]
-			fallbacks, err := fallbacks(args, listen)
+			fallbacks, err := fallbacks(p, args, listen)
 			if err != nil {
 				return err
 			}
@@ -104,26 +105,25 @@ func ensurePort(addr string) string {
 	return addr
 }
 
-func fallbacks(args []string, listen string) ([]string, error) {
+func fallbacks(p *locals.Platform, args []string, listen string) ([]string, error) {
 	if len(args) > 1 {
 		return strings.Split(args[1], ","), nil
 	}
-	allNameservers, err := nameservers(resolvConf)
+	allNameservers, err := nameservers(p, resolvConf)
 	if err != nil {
 		return nil, fmt.Errorf("failed to detect nameservers: %w", err)
 	}
 	return removeIfFound(allNameservers, listen), nil
 }
 
-func nameservers(path string) ([]string, error) {
-	file, err := os.Open(path)
+func nameservers(p *locals.Platform, path string) ([]string, error) {
+	contents, err := p.IO.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
-	defer file.Close()
 
 	var nameservers []string
-	scanner := bufio.NewScanner(file)
+	scanner := bufio.NewScanner(bytes.NewBuffer(contents))
 	for scanner.Scan() {
 		line := scanner.Text()
 		line = strings.TrimSpace(line)

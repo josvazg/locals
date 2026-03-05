@@ -3,10 +3,8 @@ package cmds
 import (
 	"encoding/json"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
-	"syscall"
 
 	"locals/api/locals"
 
@@ -28,7 +26,7 @@ func status(p *locals.Platform, configDir string) error {
 	fmt.Println("----------- 📍 Locals Status -----------")
 
 	dnsMode := "🔓 INACTIVE"
-	mounts, err := os.ReadFile("/proc/mounts")
+	mounts, err := p.IO.ReadFile("/proc/mounts")
 	if err != nil {
 		return fmt.Errorf("failed to check mounts: %w", err)
 	}
@@ -37,13 +35,13 @@ func status(p *locals.Platform, configDir string) error {
 	}
 	fmt.Printf("DNS System:  %s\n", dnsMode)
 
-	if isProcessAlive(filepath.Join(configDir, "dns.pid")) {
+	if isProcessAlive(p, filepath.Join(configDir, "dns.pid")) {
 		fmt.Println("DNS Service: 🟢 RUNNING")
 	} else {
 		fmt.Println("DNS Service: 🔴 OFF")
 	}
 
-	if isProcessAlive(filepath.Join(configDir, "web.pid")) {
+	if isProcessAlive(p, filepath.Join(configDir, "web.pid")) {
 		fmt.Println("Web Proxy:   🟢 RUNNING")
 		fmt.Println("\nActive web entrypoints:")
 	} else {
@@ -52,7 +50,7 @@ func status(p *locals.Platform, configDir string) error {
 	}
 
 	rulesDir := filepath.Join(configDir, "web")
-	files, _ := os.ReadDir(rulesDir)
+	files, _ := p.IO.ReadDir(rulesDir)
 
 	count := 0
 	for _, f := range files {
@@ -60,7 +58,7 @@ func status(p *locals.Platform, configDir string) error {
 			count++
 			name := strings.TrimSuffix(f.Name(), ".json")
 			target := "unknown"
-			if content, err := os.ReadFile(filepath.Join(rulesDir, f.Name())); err == nil {
+			if content, err := p.IO.ReadFile(filepath.Join(rulesDir, f.Name())); err == nil {
 				webConfig := WebConfig{}
 				if err := json.Unmarshal(content, &webConfig); err == nil {
 					name = webConfig.URL
@@ -78,22 +76,14 @@ func status(p *locals.Platform, configDir string) error {
 	return nil
 }
 
-func isProcessAlive(pidPath string) bool {
-	data, err := os.ReadFile(pidPath)
+func isProcessAlive(p *locals.Platform, pidPath string) bool {
+	data, err := p.IO.ReadFile(pidPath)
 	if err != nil {
 		return false
 	}
-
 	var pid int
 	if _, err := fmt.Sscanf(string(data), "%d", &pid); err != nil {
 		return false
 	}
-
-	process, err := os.FindProcess(pid)
-	if err != nil {
-		return false
-	}
-
-	// Signal 0 is the "ping" of process management
-	return process.Signal(syscall.Signal(0)) == nil
+	return p.Process.IsProcessAlive(pid)
 }

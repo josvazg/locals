@@ -5,6 +5,7 @@ import (
 	"io/fs"
 	"os"
 	"os/exec"
+	"syscall"
 
 	"locals/internal/env"
 )
@@ -14,7 +15,6 @@ const (
 	DirName  = ".config/locals"
 	WebDir   = "web"
 	CertsDir = "certs"
-	LogsDir  = "logs"
 )
 
 const (
@@ -32,6 +32,7 @@ type Platform struct {
 	// HomeDir is a function to find the user's home without hardcoding os.UserHomeDir
 	HomeDir func() (string, error)
 	IO      FilesHandler
+	Process ProcessInfo
 	// Execute is a function to run external binaries (mkcert, traefik)
 	Execute func(name string, args ...string) error
 }
@@ -45,6 +46,7 @@ func RealOSPlatform() *Platform {
 		Env:     os.Getenv,
 		HomeDir: os.UserHomeDir,
 		IO:      &osFileshandler{},
+		Process: &osProcessInfo{},
 		Execute: func(name string, args ...string) error {
 			cmd := exec.Command(name, args...)
 			cmd.Stdout = os.Stdout // Uncomment to see mkcert output
@@ -91,4 +93,20 @@ func (osf *osFileshandler) Stat(filename string) (os.FileInfo, error) {
 
 func (osf *osFileshandler) Remove(filename string) error {
 	return os.Remove(filename)
+}
+
+type ProcessInfo interface {
+	IsProcessAlive(pid int) bool
+}
+
+type osProcessInfo struct {
+}
+
+func (pi *osProcessInfo) IsProcessAlive(pid int) bool {
+	process, err := os.FindProcess(pid)
+	if err != nil {
+		return false
+	}
+	// Signal 0 is the "ping" of process management
+	return process.Signal(syscall.Signal(0)) == nil
 }

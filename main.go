@@ -1,15 +1,21 @@
 package main
 
 import (
+	"context"
 	"log"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"locals/api/locals"
 	"locals/internal/cmds"
 )
 
 func main() {
-	if err := cmds.Run(locals.RealOSPlatform(), os.Args[1:]); err != nil {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	if err := cmds.Run(ctx, locals.RealOSPlatform(), os.Args[1:]); err != nil {
 		log.Printf("locals failed: %v", err)
 	}
 }

@@ -6,11 +6,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"locals/api/locals"
 	"log"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
-	"os"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -96,7 +96,7 @@ func (s *proxyStore) DeleteEndpoint(host string) {
 	delete(s.certs, host)
 }
 
-func webCmd(ctx context.Context, cfgDir string) *cobra.Command {
+func webCmd(ctx context.Context, p *locals.Platform, cfgDir string) *cobra.Command {
 	return &cobra.Command{
 		Use:   "web [configDir]",
 		Short: "Run the locals Web reverse proxy service",
@@ -106,18 +106,18 @@ func webCmd(ctx context.Context, cfgDir string) *cobra.Command {
 			if len(args) > 0 {
 				webDir = args[0]
 			}
-			return runWeb(ctx, ensureAbsolutePath(webDir, cfgDir))
+			return runWeb(ctx, p, ensureAbsolutePath(webDir, cfgDir))
 		},
 	}
 }
 
-func runWeb(ctx context.Context, webDir string) error {
+func runWeb(ctx context.Context, p *locals.Platform, webDir string) error {
 	store := &proxyStore{
 		routes: make(map[string]*url.URL),
 		certs:  make(map[string]*tls.Certificate),
 	}
 
-	if err := loadConfig(store, webDir); err != nil {
+	if err := loadConfig(p, store, webDir); err != nil {
 		return fmt.Errorf("failed to load config: %s", err)
 	}
 
@@ -132,7 +132,7 @@ func runWeb(ctx context.Context, webDir string) error {
 	watcher, _ := fsnotify.NewWatcher()
 	defer watcher.Close()
 	watcher.Add(webDir)
-	go detectChangesLoop(ctx, store, webDir, watcher)
+	go detectChangesLoop(ctx, p, store, webDir, watcher)
 
 	log.Printf("🚀 Web Proxy listening on %s", ListenAddr)
 	go func() {
@@ -159,12 +159,12 @@ func ensureAbsolutePath(dir, cfgDir string) string {
 	return filepath.Join(cfgDir, filepath.Clean(dir))
 }
 
-func loadConfig(store ProxyStore, webDir string) error {
+func loadConfig(p *locals.Platform, store ProxyStore, webDir string) error {
 	log.Printf("loading web configs from %s", webDir)
 	files, _ := filepath.Glob(filepath.Join(webDir, "*.json"))
 	hosts := map[string]struct{}{}
 	for _, f := range files {
-		data, _ := os.ReadFile(f)
+		data, _ := p.IO.ReadFile(f)
 		var cfg WebConfig
 		if err := json.Unmarshal(data, &cfg); err != nil {
 			return fmt.Errorf("failed to load web config: %w", err)
@@ -232,7 +232,7 @@ func getCertificate(store ProxyStore) func(*tls.ClientHelloInfo) (*tls.Certifica
 	}
 }
 
-func detectChangesLoop(ctx context.Context, store ProxyStore, webDir string, watcher *fsnotify.Watcher) {
+func detectChangesLoop(ctx context.Context, p *locals.Platform, store ProxyStore, webDir string, watcher *fsnotify.Watcher) {
 	for {
 		select {
 		case event, ok := <-watcher.Events:
@@ -242,7 +242,7 @@ func detectChangesLoop(ctx context.Context, store ProxyStore, webDir string, wat
 			// Ignore chmod, only care about data changes
 			if event.Has(fsnotify.Write) || event.Has(fsnotify.Create) || event.Has(fsnotify.Remove) {
 				log.Println("Config changed, reloading routes...")
-				if err := loadConfig(store, webDir); err != nil {
+				if err := loadConfig(p, store, webDir); err != nil {
 					log.Printf("reload failed: %v", err)
 				}
 			}

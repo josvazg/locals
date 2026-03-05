@@ -3,10 +3,7 @@ package cmds
 import (
 	"context"
 	"fmt"
-	"os"
-	"os/signal"
 	"path/filepath"
-	"syscall"
 
 	"locals/api/locals"
 
@@ -52,7 +49,7 @@ type Server struct {
 	URL string `yaml:"url"`
 }
 
-func Run(p *locals.Platform, args []string) error {
+func Run(ctx context.Context, p *locals.Platform, args []string) error {
 	cfgDir, err := localsDir(p)
 	if err != nil {
 		return fmt.Errorf("failed to compute config dir location: %w", err)
@@ -63,7 +60,7 @@ func Run(p *locals.Platform, args []string) error {
 
 	rootCmd := &cobra.Command{
 		Use: "locals",
-		// This prevents Cobra from printing errors to os.Stderr automatically
+		// This prevents Cobra from printing errors to std err automatically
 		// allowing you to handle them via your Platform.Stderr instead.
 		SilenceErrors: true,
 		SilenceUsage:  false,
@@ -71,10 +68,6 @@ func Run(p *locals.Platform, args []string) error {
 	rootCmd.SetOut(p.Stdout)
 	rootCmd.SetErr(p.Stderr)
 	rootCmd.SetArgs(args)
-
-	ctx, stop := signal.NotifyContext(
-		context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
 
 	on := onCmd(p, cfgDir)
 	off := offCmd(p, cfgDir)
@@ -89,8 +82,8 @@ func Run(p *locals.Platform, args []string) error {
 		off,
 		add,
 		rm,
-		dnsCmd(ctx),
-		webCmd(ctx, cfgDir),
+		dnsCmd(ctx, p),
+		webCmd(ctx, p, cfgDir),
 		statusCmd(p, cfgDir),
 		envCmd(),
 	)
@@ -111,14 +104,12 @@ func localsDir(p *locals.Platform) (string, error) {
 
 // initFileSystem creates ~/.config/locals directories
 func initFileSystem(p *locals.Platform, cfgDir string) error {
-	dirs := []string{locals.WebDir, locals.CertsDir, locals.LogsDir}
+	dirs := []string{locals.WebDir, locals.CertsDir}
 
 	for _, d := range dirs {
 		path := filepath.Join(cfgDir, d)
-		if _, err := p.IO.Stat(path); os.IsNotExist(err) {
-			if err := p.IO.MkdirAll(path, 0755); err != nil {
-				return fmt.Errorf("failed to create config subdir: %w", err)
-			}
+		if err := p.IO.MkdirAll(path, 0755); err != nil {
+			return fmt.Errorf("failed to create config subdir: %w", err)
 		}
 	}
 	return nil
