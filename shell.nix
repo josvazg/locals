@@ -1,6 +1,6 @@
 let
   pkgs = import (builtins.fetchTarball {
-    url = "https://github.com/NixOS/nixpkgs/archive/nixos-23.11.tar.gz";
+    url = "https://github.com/NixOS/nixpkgs/archive/nixos-25.11.tar.gz";
     sha256 = "sha256:1f5d2g1p6nfwycpmrnnmc2xmcszp804adp16knjvdkj8nz36y1fg";
   }) {};
 
@@ -16,22 +16,14 @@ pkgs.mkShell {
     pkgs.curl
     pkgs.git
     unstable.go
-    pkgs.vscodium
     pkgs.shellcheck
     pkgs.neovim
-    pkgs.ripgrep
-    pkgs.wl-clipboard
-    pkgs.jq
-    pkgs.gotools
-    pkgs.gopls
     pkgs.mkcert
-    pkgs.traefik
   ];
 
   shellHook = ''
     export PATH=$PATH:$(go env GOPATH)/bin
-    export EDITOR=vim
+    export EDITOR=nvim
     export CGO_CFLAGS="-O2" # makes delve work in vscodium
-    alias mage='go tool mage'
   '';
 }
