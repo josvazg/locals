@@ -10,7 +10,7 @@ Locals is a lightweight developer tool designed to make local service developmen
 
 ## Prerequisites
 
-The locals tool requires `mkcert` to be installed on your system. You can get it from [github.com/FiloSottile/mkcert)](https://github.com/FiloSottile/mkcert)
+The locals tool requires `mkcert` to be installed on your system. You can get it from [github.com/FiloSottile/mkcert](https://github.com/FiloSottile/mkcert)
 
 The `:443` *tcp* and `:53` *udp* ports must not be in use. If you have a service in `127.0.0.1:53` it is fine, `locals dns` listends on `127.1.2.3:53` instead, but if a service (such as dnsmasq) is listening on `0.0.0.0:53`, locals dns will not work. 
 
