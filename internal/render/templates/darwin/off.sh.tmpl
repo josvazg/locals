@@ -7,7 +7,7 @@ DNS_LISTEN="{{.DNSListen}}"
 DNS_PID_FILE="${LOCALS_DIR}/dns.pid"
 # This removes the locals dns redirect
 sudo ifconfig lo0 -alias "${DNS_LISTEN}" || echo "locals dns address already unmapped"
-sudo rm /etc/resolver/locals || echo "dns locals redirect already removed"
+sudo rm -f /etc/resolver/locals
 
 if [ -f "$DNS_PID_FILE" ]; then
     DNS_PID=$(cat "$DNS_PID_FILE")
@@ -44,4 +44,4 @@ else
 fi
 
 # --- disable mkcerts ---
-mkcert -uninstall
+mkcert -uninstall || echo "mkcert already uninstalled?"

@@ -1,10 +1,12 @@
 package locals
 
 import (
+	"errors"
 	"io"
 	"io/fs"
 	"os"
 	"os/exec"
+	"runtime"
 	"syscall"
 
 	"locals/internal/env"
@@ -107,6 +109,30 @@ func (pi *osProcessInfo) IsProcessAlive(pid int) bool {
 	if err != nil {
 		return false
 	}
-	// Signal 0 is the "ping" of process management
-	return process.Signal(syscall.Signal(0)) == nil
+
+	// Signal(0) doesn't send a signal, but performs error checking.
+	err = process.Signal(syscall.Signal(0))
+
+	if err == nil {
+		// On both Linux and macOS, nil error means the process exists
+		// and we have permission to talk to it.
+		return true
+	}
+
+	if runtime.GOOS == "darwin" || runtime.GOOS == "linux" {
+		// If we get EPERM (Operation not permitted), the process IS alive.
+		// It just means it's owned by another user (like root).
+		if errors.Is(err, syscall.EPERM) {
+			return true
+		}
+
+		// If we get ESRCH (No such process), it's definitely dead.
+		if errors.Is(err, syscall.ESRCH) {
+			return false
+		}
+	}
+
+	// On macOS, FindProcess always succeeds, so we rely entirely on
+	// the Signal results above. If we get here, the process is likely dead.
+	return false
 }
