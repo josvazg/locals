@@ -32,7 +32,7 @@ function apply_dns_config() {
     sudo ifconfig lo0 alias "${DNS_LISTEN}" netmask 255.255.255.255
     mkdir -p /etc/resolver
     sudo tee "${RESOLV_CONF_LOCAL}" > /dev/null <<EOF
-nameserver "${DNS_LISTEN}"
+nameserver ${DNS_LISTEN}
 port 53
 EOF
 }
