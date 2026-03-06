@@ -22,7 +22,7 @@ func offCmd(p *locals.Platform, localsDir string) *cobra.Command {
 
 func off(p *locals.Platform, localsDir string) error {
 	state := render.State{
-		DNSListen: DefaultDNSListen,
+		DNSListen: locals.DefaultDNSListen,
 		LocalsDir: localsDir,
 		SystemCA:  p.Env.SystemCA(),
 	}

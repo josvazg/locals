@@ -2,11 +2,14 @@ package locals
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"io/fs"
+	"net"
 	"os"
 	"os/exec"
 	"runtime"
+	"strings"
 	"syscall"
 
 	"locals/internal/env"
@@ -17,6 +20,8 @@ const (
 	DirName  = ".config/locals"
 	WebDir   = "web"
 	CertsDir = "certs"
+
+	DefaultDNSListen = "127.1.2.3"
 )
 
 const (
@@ -36,7 +41,21 @@ type Platform struct {
 	IO      FilesHandler
 	Process ProcessInfo
 	// Execute is a function to run external binaries (mkcert, traefik)
-	Execute func(name string, args ...string) error
+	Execute       func(name string, args ...string) error
+	CheckDNSSetup func()*DNSStatus
+}
+
+type DNSStatus struct {
+	Active bool
+	Status string
+}
+
+func (s *DNSStatus) String() string {
+	icon := "🔓"
+	if !s.Active {
+		icon = "⚠️"
+	}
+	return fmt.Sprintf("%s %s", icon, s.Status)
 }
 
 // Returns a real OS platform impementation
@@ -55,6 +74,12 @@ func RealOSPlatform() *Platform {
 			cmd.Stderr = os.Stderr
 			return cmd.Run()
 		},
+		CheckDNSSetup: func() func()*DNSStatus {
+			if runtime.GOOS == "darwin" {
+				return checkMacDNSSetup
+			}
+			return checkLinuxDNSSetup
+		}(),
 	}
 }
 
@@ -134,5 +159,60 @@ func (pi *osProcessInfo) IsProcessAlive(pid int) bool {
 
 	// On macOS, FindProcess always succeeds, so we rely entirely on
 	// the Signal results above. If we get here, the process is likely dead.
+	return false
+}
+
+func checkLinuxDNSSetup() *DNSStatus {
+	active := false
+	dnsMode := "INACTIVE"
+	mounts, err := os.ReadFile("/proc/mounts")
+	if err != nil {
+		dnsMode = fmt.Sprintf("failed to check mounts: %v", err)
+	}
+	if strings.Contains(string(mounts), " /etc/resolv.conf ") {
+		dnsMode = "BIND-MOUNT ACTIVE"
+	}
+	return &DNSStatus{
+		Active: active,
+		Status: dnsMode,
+	}
+}
+
+func checkMacDNSSetup() *DNSStatus {
+	dnsMode := "INACTIVE"
+	dnsConfig, err := os.ReadFile("/etc/resolver/locals")
+	hasFile := err == nil && len(dnsConfig) > 0
+
+	hasAlias := isIPOnInterface("lo0", DefaultDNSListen)
+
+	if hasFile && hasAlias {
+		dnsMode = "RESOLVER REDIRECT ACTIVE"
+	} else if hasFile && !hasAlias {
+		dnsMode = "MISSING DNS IP ALIAS"
+	} else if !hasFile && hasAlias {
+		dnsMode = "MISSING DNS RESOLVER FILE"
+	}
+	return &DNSStatus{
+		Active: hasFile && hasAlias,
+		Status: dnsMode,
+	}
+}
+
+func isIPOnInterface(ifaceName, targetIP string) bool {
+	iface, err := net.InterfaceByName(ifaceName)
+	if err != nil {
+		return false
+	}
+	addrs, err := iface.Addrs()
+	if err != nil {
+		return false
+	}
+	for _, addr := range addrs {
+		// addr is in CIDR format like "127.1.2.3/32"
+		ip, _, _ := net.ParseCIDR(addr.String())
+		if ip != nil && ip.String() == targetIP {
+			return true
+		}
+	}
 	return false
 }

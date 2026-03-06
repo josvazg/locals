@@ -3,9 +3,7 @@ package cmds
 import (
 	"encoding/json"
 	"fmt"
-	"net"
 	"path/filepath"
-	"runtime"
 	"strings"
 
 	"locals/api/locals"
@@ -27,30 +25,8 @@ func statusCmd(p *locals.Platform, localsDir string) *cobra.Command {
 func status(p *locals.Platform, configDir string) error {
 	fmt.Println("----------- 📍 Locals Status -----------")
 
-	dnsMode := "🔓 INACTIVE"
-	if runtime.GOOS == "linux" {
-		mounts, err := p.IO.ReadFile("/proc/mounts")
-		if err != nil {
-			return fmt.Errorf("failed to check mounts: %w", err)
-		}
-		if strings.Contains(string(mounts), " /etc/resolv.conf ") {
-			dnsMode = "🔒 BIND-MOUNT ACTIVE"
-		}
-	} else {
-		dnsConfig, err := p.IO.ReadFile("/etc/resolver/locals")
-        hasFile := err == nil && len(dnsConfig) > 0
-        
-        hasAlias := isIPOnInterface("lo0", DefaultDNSListen)
-
-        if hasFile && hasAlias {
-            dnsMode = "🔒 RESOLVER REDIRECT ACTIVE"
-        } else if hasFile && !hasAlias {
-            dnsMode = "⚠️ MISSING DNS IP ALIAS"        
-		} else if !hasFile && hasAlias {
-            dnsMode = "⚠️ MISSING DNS RESOLVER FILE"
-        }
-	}
-	fmt.Printf("DNS System:  %s\n", dnsMode)
+	dnsStatus := p.CheckDNSSetup()
+	fmt.Printf("DNS System:  %s\n", dnsStatus)
 
 	if isProcessAlive(p, filepath.Join(configDir, "dns.pid")) {
 		fmt.Println("DNS Service: 🟢 RUNNING")
@@ -103,23 +79,4 @@ func isProcessAlive(p *locals.Platform, pidPath string) bool {
 		return false
 	}
 	return p.Process.IsProcessAlive(pid)
-}
-
-func isIPOnInterface(ifaceName, targetIP string) bool {
-	iface, err := net.InterfaceByName(ifaceName)
-	if err != nil {
-		return false
-	}
-	addrs, err := iface.Addrs()
-	if err != nil {
-		return false
-	}
-	for _, addr := range addrs {
-		// addr is in CIDR format like "127.1.2.3/32"
-		ip, _, _ := net.ParseCIDR(addr.String())
-		if ip != nil && ip.String() == targetIP {
-			return true
-		}
-	}
-	return false
 }

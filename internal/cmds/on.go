@@ -10,10 +10,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const (
-	DefaultDNSListen = "127.1.2.3"
-)
-
 func onCmd(p *locals.Platform, localsDir string) *cobra.Command {
 	return &cobra.Command{
 		Use:   "on",
@@ -26,7 +22,7 @@ func onCmd(p *locals.Platform, localsDir string) *cobra.Command {
 
 func on(p *locals.Platform, localsDir string, dryrun bool) error {
 	state := render.State{
-		DNSListen: DefaultDNSListen,
+		DNSListen: locals.DefaultDNSListen,
 		LocalsDir: localsDir,
 		SystemCA:  p.Env.SystemCA(),
 	}
