@@ -73,3 +73,5 @@ Undoes the bind mount and stops the services. The system is back to normal and t
 ## Tested Operating Systems
 
 - NixOS
+- MacOS
+
