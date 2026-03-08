@@ -51,9 +51,6 @@ WEB_PID_FILE="${LOCALS_DIR}/web.pid"
 RULES_DIR="${LOCALS_DIR}/web"
 BINARY_PATH="$(which locals)"
 
-# Give the binary permission to bind to port 443 without sudo
-sudo setcap 'cap_net_bind_service=+ep' "$BINARY_PATH"
-
 function launch_web() {
     mkdir -p "$RULES_DIR"
     if [ -f "$WEB_PID_FILE" ]; then
@@ -63,7 +60,7 @@ function launch_web() {
             return
         fi
     fi
-    nohup locals web > /tmp/locals-web.log 2>&1 &
+    sudo nohup locals web "${RULES_DIR}" > /tmp/locals-web.log 2>&1 &
     echo $! > "$WEB_PID_FILE"
     echo "✅ Web proxy active on :443 (PID: $(cat $WEB_PID_FILE))"
 }
