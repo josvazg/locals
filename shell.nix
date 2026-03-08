@@ -1,12 +1,12 @@
 let
   pkgs = import (builtins.fetchTarball {
     url = "https://github.com/NixOS/nixpkgs/archive/nixos-25.11.tar.gz";
-    sha256 = "sha256:15gvdgdqsxjjihq1r66qz1q97mlcaq1jbpkhbx287r5py2vy38b1";
+    #sha256 = "sha256:15gvdgdqsxjjihq1r66qz1q97mlcaq1jbpkhbx287r5py2vy38b1";
   }) {};
 
   unstable = import (builtins.fetchTarball {
     url = "https://github.com/NixOS/nixpkgs/archive/nixos-unstable.tar.gz";
-    sha256 = "sha256:15gvdgdqsxjjihq1r66qz1q97mlcaq1jbpkhbx287r5py2vy38b1";
+    #sha256 = "sha256:15gvdgdqsxjjihq1r66qz1q97mlcaq1jbpkhbx287r5py2vy38b1";
   }) {};
 in
 pkgs.mkShell {
