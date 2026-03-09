@@ -83,3 +83,5 @@ Stops the services and unmounts the bind mount on Linux or removes the resolver 
 - MacOS
 - Debian
 - Ubuntu
+- Fedora
+
