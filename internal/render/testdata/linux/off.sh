@@ -12,6 +12,7 @@ if mountpoint -q /etc/resolv.conf; then
 else
     echo "ℹ️ /etc/resolv.conf was not mounted."
 fi
+sudo rm -f /etc/systemd/resolved.conf.d/locals.conf
 
 if [ -f "$DNS_PID_FILE" ]; then
     DNS_PID=$(cat "$DNS_PID_FILE")

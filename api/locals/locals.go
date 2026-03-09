@@ -42,7 +42,7 @@ type Platform struct {
 	Process ProcessInfo
 	// Execute is a function to run external binaries (mkcert, traefik)
 	Execute       func(name string, args ...string) error
-	CheckDNSSetup func()*DNSStatus
+	CheckDNSSetup func() *DNSStatus
 }
 
 type DNSStatus struct {
@@ -74,7 +74,7 @@ func RealOSPlatform() *Platform {
 			cmd.Stderr = os.Stderr
 			return cmd.Run()
 		},
-		CheckDNSSetup: func() func()*DNSStatus {
+		CheckDNSSetup: func() func() *DNSStatus {
 			if runtime.GOOS == "darwin" {
 				return checkMacDNSSetup
 			}
@@ -163,15 +163,21 @@ func (pi *osProcessInfo) IsProcessAlive(pid int) bool {
 }
 
 func checkLinuxDNSSetup() *DNSStatus {
-	active := false
 	dnsMode := "INACTIVE"
-	mounts, err := os.ReadFile("/proc/mounts")
-	if err != nil {
-		dnsMode = fmt.Sprintf("failed to check mounts: %v", err)
-	}
-	if strings.Contains(string(mounts), "/stub-resolv.conf ") {
-		dnsMode = "BIND-MOUNT ACTIVE"
-		active = true
+	dnsResolvedConfig, err := os.ReadFile("/etc/systemd/resolved.conf.d/locals.conf")
+	active := err == nil && len(dnsResolvedConfig) > 0
+
+	if active {
+		dnsMode = "RESOLVED CONFIG ACTIVE"
+	} else {
+		mounts, err := os.ReadFile("/proc/mounts")
+		if err != nil {
+			dnsMode = fmt.Sprintf("failed to check mounts: %v", err)
+		}
+		if strings.Contains(string(mounts), "/stub-resolv.conf ") {
+			dnsMode = "BIND-MOUNT ACTIVE"
+			active = true
+		}
 	}
 	return &DNSStatus{
 		Active: active,
@@ -183,15 +189,15 @@ func checkMacDNSSetup() *DNSStatus {
 	dnsMode := "INACTIVE"
 	dnsConfig, err := os.ReadFile("/etc/resolver/locals")
 	hasFile := err == nil && len(dnsConfig) > 0
-
 	hasAlias := isIPOnInterface("lo0", DefaultDNSListen)
 
-	if hasFile && hasAlias {
+	switch {
+	case hasFile && hasAlias:
 		dnsMode = "RESOLVER REDIRECT ACTIVE"
-	} else if hasFile && !hasAlias {
+	case !hasAlias:
 		dnsMode = "MISSING DNS IP ALIAS"
-	} else if !hasFile && hasAlias {
-		dnsMode = "MISSING DNS RESOLVER FILE"
+	case !hasFile:
+		dnsMode = "MISSING DNS CONFIG FILE"
 	}
 	return &DNSStatus{
 		Active: hasFile && hasAlias,

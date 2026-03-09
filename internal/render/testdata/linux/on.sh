@@ -28,12 +28,27 @@ function launch_dns() {
     echo "✅ locals DNS started on $DNS_LISTEN (PID: $(cat $DNS_PID_FILE))"
 }
 
-function apply_dns_config() {
+function apply_dns_config_resolved() {
+        echo "📡 systemd-resolved detected. Using Routing Domain setup."
+        RESOLVED_CONF="/etc/systemd/resolved.conf.d/locals.conf"
+        sudo mkdir -p /etc/systemd/resolved.conf.d/
+        sudo tee "$RESOLVED_CONF" > /dev/null <<EOF
+[Resolve]
+DNS=127.1.2.3
+Domains=~locals
+EOF
+
+        sudo systemctl restart systemd-resolved
+        echo "🔒 systemd-resolved configured to route .locals to 127.1.2.3"
+}
+
+function apply_dns_config_bindmount() {
     if mountpoint -q "/etc/resolv.conf"; then
         echo "⚠️ /etc/resolv.conf already replaced. Skipping."
         return
     fi
 
+    echo "📡 systemd-resolved not found. Falling back to /etc/resolv.conf bind-mount."
     cat <<EOF > "$RESOLV_CONF_LOCAL"
 nameserver 127.1.2.3
 options edns0 trust-ad
@@ -43,13 +58,21 @@ EOF
     echo "🔒 /etc/resolv.conf mounted to redirect DNS queries to locals dns first"
 }
 
+function apply_dns_config() {
+    if [ -d "/run/systemd/resolve" ] || systemctl is-active --quiet systemd-resolved; then
+       apply_dns_config_resolved
+       return
+    fi
+    apply_dns_config_bindmount
+}
+
 launch_dns
 apply_dns_config
 
 # --- stop locals web proxy ---
 WEB_PID_FILE="${LOCALS_DIR}/web.pid"
 RULES_DIR="${LOCALS_DIR}/web"
-BINARY_PATH="$(which locals)"
+BINARY_PATH="$(type -p locals)"
 
 function launch_web() {
     mkdir -p "$RULES_DIR"
