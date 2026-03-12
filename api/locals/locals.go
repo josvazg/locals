@@ -170,11 +170,11 @@ func checkLinuxDNSSetup() *DNSStatus {
 	if active {
 		dnsMode = "RESOLVED CONFIG ACTIVE"
 	} else {
-		mounts, err := os.ReadFile("/proc/mounts")
+		mounts, err := os.ReadFile("/proc/self/mountinfo")
 		if err != nil {
 			dnsMode = fmt.Sprintf("failed to check mounts: %v", err)
 		}
-		if strings.Contains(string(mounts), "/stub-resolv.conf ") {
+		if strings.Contains(string(mounts), "/resolv.patched.conf") {
 			dnsMode = "BIND-MOUNT ACTIVE"
 			active = true
 		}
