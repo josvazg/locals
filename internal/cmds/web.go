@@ -106,6 +106,7 @@ func webCmd(ctx context.Context, p *locals.Platform, cfgDir string) *cobra.Comma
 			if len(args) > 0 {
 				webDir = args[0]
 			}
+			cmd.SilenceUsage = true
 			return runWeb(ctx, p, ensureAbsolutePath(webDir, cfgDir))
 		},
 	}

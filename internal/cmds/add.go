@@ -18,6 +18,7 @@ func addCmd(p *locals.Platform, localsDir string) *cobra.Command {
 			"$ add https://whoami.locals localhost:8080",
 		Args: cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			cmd.SilenceUsage = true
 			domain := args[0]
 			targetURL := args[1]
 			return add(p, localsDir, domain, targetURL)

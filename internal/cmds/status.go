@@ -17,6 +17,7 @@ func statusCmd(p *locals.Platform, localsDir string) *cobra.Command {
 		Short: "Show locals status",
 		Args:  cobra.ExactArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			cmd.SilenceUsage = true
 			return status(p, localsDir)
 		},
 	}

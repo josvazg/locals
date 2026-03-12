@@ -18,6 +18,7 @@ func rmCmd(p *locals.Platform, localsDir string) *cobra.Command {
 			"$ rm whoami.service localhost:8009",
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			cmd.SilenceUsage = true
 			domain := args[0]
 			return rm(p, localsDir, domain)
 		},

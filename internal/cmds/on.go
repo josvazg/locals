@@ -15,6 +15,7 @@ func onCmd(p *locals.Platform, localsDir string) *cobra.Command {
 		Use:   "on",
 		Short: "Start the web proxy and grab DNS",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			cmd.SilenceUsage = true
 			return on(p, localsDir, dryrun)
 		},
 	}
