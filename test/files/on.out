@@ -1,0 +1,10 @@
+Installing to the system store is not yet supported on this Linux 😣 but Firefox and/or Chrome/Chromium will still work.
+You can also manually install the root certificate at "/home/jz/.local/share/mkcert/rootCA.pem".
+The local CA is now installed in the Firefox and/or Chrome/Chromium trust store (requires browser restart)! 🦊
+
+For CLI usage run
+source <(locals env)
+✅ locals DNS started on 127.1.2.3 \(PID: [0-9]+\)
+📡 systemd-resolved not found. Falling back to /etc/resolv.conf bind-mount.
+🔒 /etc/resolv.conf mounted to redirect DNS queries to locals dns first
+✅ Web proxy active on :443 \(PID: [0-9]+\)
