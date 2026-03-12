@@ -34,7 +34,7 @@ if [ -f "$WEB_PID_FILE" ]; then
     PID=$(cat "$WEB_PID_FILE")
     if kill -0 "$PID" 2>/dev/null; then
         kill "$PID"
-        echo "🛑 Stopped web process ($PID)"
+        echo "🛑 Stopped web process (PID: $PID)"
     else
         echo "⚠️ Web proxy was not running (stale PID file)."
     fi

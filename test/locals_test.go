@@ -19,6 +19,8 @@ func TestLocals(t *testing.T) {
 	testInactive(ctx, t)
 	testOn(ctx, t)
 	testActive(ctx, t)
+	testOff(ctx, t)
+	testInactive(ctx, t)
 }
 
 func testInactive(ctx context.Context, t *testing.T) {
@@ -36,7 +38,12 @@ func testActive(ctx context.Context, t *testing.T) {
 	testCmd(ctx, t, "active.out", "status")
 }
 
-func testCmd(ctx context.Context, t *testing.T, wantFile string, args ... string) {
+func testOff(ctx context.Context, t *testing.T) {
+	t.Helper()
+	testCmd(ctx, t, "off.out", "off")
+}
+
+func testCmd(ctx context.Context, t *testing.T, wantFile string, args ...string) {
 	t.Helper()
 
 	got, err := runLocals(ctx, args...)
