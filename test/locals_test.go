@@ -2,7 +2,10 @@ package test
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"fmt"
+	"io"
 	"locals/test/files"
 	"log"
 	"net/http"
@@ -34,6 +37,7 @@ func TestLocals(t *testing.T) {
 	testOn(ctx, t)
 	testActive(ctx, t)
 	testAdds(ctx, t, servers)
+	testServers(t, servers)
 	testRemovals(ctx, t, servers)
 	testOff(ctx, t)
 	testInactive(ctx, t)
@@ -98,16 +102,57 @@ func testAdds(ctx context.Context, t *testing.T, servers []*httptest.Server) {
 	addContent := loadFile(t, "add.out")
 	for _, server := range sortByPort(servers) {
 		endpoint := server.Listener.Addr().String()
-		parts := strings.Split(endpoint, ":")
-		port := parts[len(parts)-1]
-		url := fmt.Sprintf("service-%s.locals", port)
+		url := serviceURL(portFrom(endpoint))
 		serviceList = fmt.Sprintf("%s  🔗 %s -> %s\n", serviceList, url, endpoint)
 		testCmd(ctx, t, addContent, "add", url, endpoint)
-	}		
+	}
 	added := loadFile(t, "active.out")
 	patchedAdded := strings.Replace(added, `  \(none\)`, serviceList[:len(serviceList)-1], 1)
-	log.Printf("patchedAdded:\n%s", patchedAdded)
 	testCmd(ctx, t, patchedAdded, "status")
+}
+
+func testServers(t *testing.T, servers []*httptest.Server) {
+	t.Helper()
+	client := testClient(t)
+	for _, server := range servers {
+		endpoint := server.Listener.Addr().String()
+		url := fmt.Sprintf("https://%s", serviceURL(portFrom(endpoint)))
+		res, err := client.Get(url)
+		if err != nil {
+			require.NoError(t, err)
+		}
+		greeting, err := io.ReadAll(res.Body)
+		res.Body.Close()
+		if err != nil {
+			require.NoError(t, err)
+		}
+		want := fmt.Sprintf("Hello from server at %s", server.Listener.Addr())
+		assert.Equal(t, want, string(greeting))
+	}
+}
+
+func testClient(t *testing.T) *http.Client {
+	homedir, err := os.UserHomeDir()
+	assert.NoError(t, err)
+	caPath := filepath.Join(homedir, ".local/share/mkcert/rootCA.pem")
+	assert.NoError(t, err)
+
+	caCert, err := os.ReadFile(caPath)
+	require.NoError(t, err, "failed to read mkcert CA file")
+
+	certPool, err := x509.SystemCertPool()
+	if err != nil {
+		certPool = x509.NewCertPool()
+	}
+	certPool.AppendCertsFromPEM(caCert)
+
+	return &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{
+				RootCAs: certPool,
+			},
+		},
+	}
 }
 
 func testRemovals(ctx context.Context, t *testing.T, servers []*httptest.Server) {
@@ -115,11 +160,18 @@ func testRemovals(ctx context.Context, t *testing.T, servers []*httptest.Server)
 	addContent := loadFile(t, "rm.out")
 	for _, server := range sortByPort(servers) {
 		endpoint := server.Listener.Addr().String()
-		parts := strings.Split(endpoint, ":")
-		port := parts[len(parts)-1]
-		url := fmt.Sprintf("service-%s.locals", port)
+		url := fmt.Sprintf("service-%s.locals", portFrom(endpoint))
 		testCmd(ctx, t, addContent, "rm", url)
-	}		
+	}
+}
+
+func portFrom(addr string) string {
+	parts := strings.Split(addr, ":")
+	return parts[len(parts)-1]
+}
+
+func serviceURL(port string) string {
+	return fmt.Sprintf("service-%s.locals", port)
 }
 
 func sortByPort(servers []*httptest.Server) []*httptest.Server {
