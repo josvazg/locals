@@ -1,0 +1,78 @@
+name: Native OS Tests
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+jobs:
+  test-linux:
+    name: ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Ubuntu
+            image: ubuntu:latest
+            # DEBIAN_FRONTEND prevents apt from hanging on timezone prompts
+            pkg_cmd: apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y golang git sudo
+          - name: Debian
+            image: debian:stable-slim
+            pkg_cmd: apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y golang git sudo
+          - name: Fedora
+            image: fedora:latest
+            pkg_cmd: dnf install -y golang git sudo
+          - name: Arch
+            image: archlinux:latest
+            pkg_cmd: pacman -Syu --noconfirm go git sudo
+          - name: NixOS
+            image: nixos/nix:latest
+            pkg_cmd: nix-channel --update && nix-env -iA nixpkgs.go nixpkgs.git
+    
+    container:
+      image: ${{ matrix.image }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Native Dependencies
+        run: ${{ matrix.pkg_cmd }}
+
+      - name: Setup Sudo Shim
+        run: |
+          # If we are root (which standard containers are), fake sudo.
+          if [ "$(id -u)" -eq 0 ]; then
+            echo '#!/bin/sh' > /usr/local/bin/sudo
+            echo '"$@"' >> /usr/local/bin/sudo
+            chmod +x /usr/local/bin/sudo
+            
+            # Ensure the shim is prioritized in the PATH
+            echo "/usr/local/bin" >> $GITHUB_PATH
+          fi
+
+      - name: Install Mage & Run Tests
+        run: |
+          go install github.com/magefile/mage@latest
+          export PATH=$PATH:$(go env GOPATH)/bin
+          
+          mage test
+
+  test-macos:
+    name: MacOS
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Native Dependencies
+        # Using Homebrew as the native package manager for macOS
+        run: brew install go
+
+      - name: Install Mage & Run Tests
+        run: |
+          go install github.com/magefile/mage@latest
+          export PATH=$PATH:$(go env GOPATH)/bin
+          
+          # macOS GitHub runners have passwordless sudo by default
+          mage test
+
