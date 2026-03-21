@@ -26,6 +26,8 @@ import (
 
 const (
 	NumberOfTestServers = 3
+
+	DefaultLocals = "locals"
 )
 
 func TestLocals(t *testing.T) {
@@ -195,28 +197,12 @@ func loadFile(t *testing.T, filename string) string {
 func testCmd(ctx context.Context, t *testing.T, want string, args ...string) {
 	t.Helper()
 
-	got, err := runLocals(ctx, t, args...)
-	log.Print(string(got))
+	got, err := runLocals(ctx, args...)
 	require.NoError(t, err)
 	assert.Regexp(t, regexp.MustCompile(string(want)), string(got))
 }
 
-func runLocals(ctx context.Context, t *testing.T, args ...string) ([]byte, error) {
-	allArgs := append([]string{"run", ".."}, args...)
-	cmd := exec.CommandContext(ctx, "go", allArgs...)
-	cmd.Env = testEnv(t)
+func runLocals(ctx context.Context, args ...string) ([]byte, error) {
+	cmd := exec.CommandContext(ctx, DefaultLocals, args...)
 	return cmd.CombinedOutput()
-}
-
-func testEnv(t *testing.T) []string {
-	env := os.Environ()
-	newPath := "PATH=" + binDir(t) + string(os.PathListSeparator) + os.Getenv("PATH")
-	env = append(env, newPath)
-	return env
-}
-
-func binDir(t *testing.T) string {
-	pwd, err := os.Getwd()
-	require.NoError(t, err)
-	return filepath.Clean(filepath.Join(pwd, "..", "bin"))
 }

@@ -1,10 +1,17 @@
-// +build mage	
+//go:build mage
+// +build mage
 
 package main
 
 import (
+	"errors"
 	"fmt"
+	"io"
+	"os"
+	"path/filepath"
+	"strings"
 
+	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/sh"
 )
 
@@ -16,12 +23,61 @@ func Build() error {
 
 // Test runs all unit tests in the project.
 func Test() error {
+	mg.Deps(Build)
+
 	fmt.Println("Running tests...")
-	return sh.RunV("go", "test", "-v", "./...")
+	cwd, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("failed to get current working dir")
+	}
+	binPath := filepath.Join(cwd, "bin")
+	env := map[string]string{
+		"PATH": fmt.Sprintf("%s:%s", binPath, os.Getenv("PATH")),
+	}
+	err = runVEnv(env, "go", "test", "-v", "./...")
+	if err == nil {
+		fmt.Println("✅ All tests PASSED")
+	}
+	return err
+}
+
+// TestLinuxDistros runs all incus tests to try out all supported Linux distros
+func TestLinuxDistros() error {
+	mg.Deps(Build)
+
+	fmt.Println("Running distro tests...")
+	images := []string{
+		"archlinux",
+		"debian/14",
+		"ubuntu/25.04",
+		"fedora/41",
+		"nixos/25.11",
+	}
+	var errs error
+	for _, image := range images {
+		if err := sh.RunV("./test/incus.sh", fmt.Sprintf("images:%s", image)); err !=nil {
+			errs = errors.Join(errs, fmt.Errorf("image %s failed: %w", image, err))
+		}
+	}
+	if errs == nil {
+		fmt.Println("✅ All distro tests PASSED")
+	}
+	return errs
 }
 
 // Clean removes the build artifacts.
 func Clean() error {
 	fmt.Println("Cleaning up...")
 	return sh.Rm("bin")
+}
+
+func runVEnv(env map[string]string, cmd string, args ...string) error {
+	var stdout, stderr io.Writer
+	if mg.Verbose() {
+		stdout = os.Stdout
+		stderr = os.Stderr
+		fmt.Printf("exec: %s %s", cmd, strings.Join(args, " "))
+	}
+	_, err := sh.Exec(env, stdout, stderr, cmd, args...)
+	return err
 }

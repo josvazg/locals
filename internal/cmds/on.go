@@ -1,13 +1,23 @@
 package cmds
 
 import (
+	"errors"
 	"fmt"
+	"net"
 	"path/filepath"
+	"strings"
+	"time"
 
 	"locals/api/locals"
 	"locals/internal/render"
 
 	"github.com/spf13/cobra"
+)
+
+const (
+	probeRetries = 5
+
+	probePause = 1 * time.Second
 )
 
 func onCmd(p *locals.Platform, localsDir string) *cobra.Command {
@@ -38,5 +48,56 @@ func on(p *locals.Platform, localsDir string, dryrun bool) error {
 	if dryrun {
 		return show(onScript)
 	}
-	return run(p, onScript)
+	if err := run(p, onScript); err != nil {
+		return fmt.Errorf("failed to run on.sh script: %w", err)
+	}
+	return probeServices(state.DNSListen, ":443")
+}
+
+func probeServices(dnsListen, webListen string) error {
+	return errors.Join(
+		retry(func() error { return probeDNS(dnsListen) }, probeRetries, probePause),
+		retry(func() error { return probeWeb(webListen) }, probeRetries, probePause),
+	)
+}
+
+func retry(f func() error, retries int, pause time.Duration) error {
+	var err error
+	for range retries {
+		if err = f(); err == nil {
+			return nil
+		}
+		time.Sleep(pause)
+	}
+	return err
+}
+
+func probeDNS(dnsListen string) error {
+	d := net.Dialer{Timeout: 2 * time.Second}
+	conn, err := d.Dial("udp", completeAddress(dnsListen, 53))
+	if err != nil {
+		return fmt.Errorf("probe failed, check failure at /tmp/locals-dns.log: %w", err)
+	}
+	defer conn.Close()
+	return nil
+}
+
+func probeWeb(webListen string) error {
+	conn, err := net.DialTimeout("tcp", completeAddress(webListen, 443), 2*time.Second)
+	if err != nil {
+		return fmt.Errorf("probe failed, check failure at /tmp/locals-web.log: %w", err)
+	}
+	defer conn.Close()
+	return nil
+}
+
+func completeAddress(addr string, defaultPort int) string {
+	parts := strings.Split(addr, ":")
+	if len(parts) == 1 {
+		return fmt.Sprintf("%s:%d", addr, defaultPort)
+	}
+	if parts[0] == "" {
+		return fmt.Sprintf("127.0.0.1%s", addr)
+	}
+	return addr
 }

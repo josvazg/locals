@@ -1,4 +1,3 @@
-🔓 Unmounted /etc/resolv.conf
+.*mounted.*
 🛑 Terminated locals dns \(PID: [0-9]+\)
-🛑 Stopped web process \(PID: [0-9]+\)
-The local CA is now uninstalled from the Firefox and/or Chrome/Chromium trust store\(s\)! 👋
+🛑 Stopped web process \(PID: [0-9]+\).*

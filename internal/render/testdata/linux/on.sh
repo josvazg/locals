@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 LOCALS_DIR="/home/user/.config/locals"
+LOCALS=$(command -v locals)
 
 # --- enable mkcerts ---
 mkcert -install
@@ -23,7 +24,7 @@ function launch_dns() {
         rm "$DNS_PID_FILE"
     fi
     # note fallbacks are extracted by the not yet replace /etc/resolv.conf
-    sudo nohup locals dns "$DNS_LISTEN" > /tmp/locals-dns.log 2>&1 &
+    sudo nohup "${LOCALS}" dns "$DNS_LISTEN" > /tmp/locals-dns.log 2>&1 &
     echo $! > "$DNS_PID_FILE"
     echo "✅ locals DNS started on $DNS_LISTEN (PID: $(cat $DNS_PID_FILE))"
 }
@@ -83,7 +84,7 @@ function launch_web() {
             return
         fi
     fi
-    sudo nohup locals web "${RULES_DIR}" > /tmp/locals-web.log 2>&1 &
+    sudo nohup "${LOCALS}" web "${RULES_DIR}" > /tmp/locals-web.log 2>&1 &
     echo $! > "$WEB_PID_FILE"
     echo "✅ Web proxy active on :443 (PID: $(cat $WEB_PID_FILE))"
 }
