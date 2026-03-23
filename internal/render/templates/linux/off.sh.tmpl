@@ -20,7 +20,7 @@ if [ -f "$DNS_PID_FILE" ]; then
         kill "$DNS_PID"
         sleep 0.5
         if kill -0 "$DNS_PID" 2>/dev/null; then
-            sudo kill -9 "$PID"
+            sudo kill -9 "$DNS_PID"
         fi
 
         echo "🛑 Terminated locals dns (PID: $DNS_PID)"
