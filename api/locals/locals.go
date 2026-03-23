@@ -186,7 +186,7 @@ func checkLinuxDNSSetup() *DNSStatus {
 }
 
 func checkMacDNSSetup() *DNSStatus {
-	dnsMode := "INACTIVE"
+	dnsMode := ""
 	dnsConfig, err := os.ReadFile("/etc/resolver/locals")
 	hasFile := err == nil && len(dnsConfig) > 0
 	hasAlias := isIPOnInterface("lo0", DefaultDNSListen)
@@ -194,6 +194,8 @@ func checkMacDNSSetup() *DNSStatus {
 	switch {
 	case hasFile && hasAlias:
 		dnsMode = "RESOLVER REDIRECT ACTIVE"
+	case !hasFile && !hasAlias:
+		dnsMode = "INACTIVE"
 	case !hasAlias:
 		dnsMode = "MISSING DNS IP ALIAS"
 	case !hasFile:

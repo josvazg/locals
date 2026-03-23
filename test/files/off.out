@@ -1,3 +1,2 @@
-.*mounted.*
-🛑 Terminated locals dns \(PID: [0-9]+\)
+.*🛑 Terminated locals dns \(PID: [0-9]+\)
 🛑 Stopped web process \(PID: [0-9]+\).*

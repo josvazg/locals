@@ -39,7 +39,7 @@ func TestLocals(t *testing.T) {
 	testOn(ctx, t)
 	testActive(ctx, t)
 	testAdds(ctx, t, servers)
-	testServers(t, servers)
+	testServers(ctx, t, servers)
 	testRemovals(ctx, t, servers)
 	testOff(ctx, t)
 	testInactive(ctx, t)
@@ -113,9 +113,9 @@ func testAdds(ctx context.Context, t *testing.T, servers []*httptest.Server) {
 	testCmd(ctx, t, patchedAdded, "status")
 }
 
-func testServers(t *testing.T, servers []*httptest.Server) {
+func testServers(ctx context.Context, t *testing.T, servers []*httptest.Server) {
 	t.Helper()
-	client := testClient(t)
+	client := testClient(ctx, t)
 	for _, server := range servers {
 		endpoint := server.Listener.Addr().String()
 		url := fmt.Sprintf("https://%s", serviceURL(portFrom(endpoint)))
@@ -133,12 +133,8 @@ func testServers(t *testing.T, servers []*httptest.Server) {
 	}
 }
 
-func testClient(t *testing.T) *http.Client {
-	homedir, err := os.UserHomeDir()
-	assert.NoError(t, err)
-	caPath := filepath.Join(homedir, ".local/share/mkcert/rootCA.pem")
-	assert.NoError(t, err)
-
+func testClient(ctx context.Context, t *testing.T) *http.Client {
+	caPath := filepath.Join(mkcertCARoot(ctx, t), "rootCA.pem")
 	caCert, err := os.ReadFile(caPath)
 	require.NoError(t, err, "failed to read mkcert CA file")
 
@@ -205,4 +201,12 @@ func testCmd(ctx context.Context, t *testing.T, want string, args ...string) {
 func runLocals(ctx context.Context, args ...string) ([]byte, error) {
 	cmd := exec.CommandContext(ctx, DefaultLocals, args...)
 	return cmd.CombinedOutput()
+}
+
+func mkcertCARoot(ctx context.Context, t *testing.T) string {
+	t.Helper()
+
+	out, err := exec.CommandContext(ctx, "mkcert", "-CAROOT").Output()
+	require.NoError(t, err)
+	return strings.TrimSpace(string(out))
 }
