@@ -3,7 +3,6 @@ set -Eeuo pipefail
 LOCALS_DIR="{{.LocalsDir}}"
 
 # --- remove locals DNS ---
-DNS_LISTEN="{{.DNSListen}}"
 DNS_PID_FILE="${LOCALS_DIR}/dns.pid"
 # This restores the original /etc/resolv.conf immediately
 if mountpoint -q /etc/resolv.conf; then
@@ -36,10 +35,10 @@ fi
 WEB_PID_FILE="$HOME/.config/locals/web.pid"
 
 if [ -f "$WEB_PID_FILE" ]; then
-    PID=$(cat "$WEB_PID_FILE")
-    if kill -0 "$PID" 2>/dev/null; then
-        kill "$PID"
-        echo "🛑 Stopped web process (PID: $PID)"
+    WEB_PID=$(cat "$WEB_PID_FILE")
+    if kill -0 "$WEB_PID" 2>/dev/null; then
+        kill "$WEB_PID"
+        echo "🛑 Stopped web process (PID: $WEB_PID)"
     else
         echo "⚠️ Web proxy was not running (stale PID file)."
     fi

@@ -3,7 +3,6 @@ set -Eeuo pipefail
 LOCALS_DIR="{{.LocalsDir}}"
 
 # --- remove locals DNS ---
-DNS_LISTEN="{{.DNSListen}}"
 DNS_PID_FILE="${LOCALS_DIR}/dns.pid"
 # This removes the locals dns redirect
 sudo ifconfig lo0 -alias "${DNS_LISTEN}" || echo "locals dns address already unmapped"
@@ -15,7 +14,7 @@ if [ -f "$DNS_PID_FILE" ]; then
         kill "$DNS_PID"
         sleep 0.5
         if kill -0 "$DNS_PID" 2>/dev/null; then
-            sudo kill -9 "$PID"
+            sudo kill -9 "$DNS_PID"
         fi
 
         echo "🛑 Terminated locals dns (PID: $DNS_PID)"
@@ -31,10 +30,10 @@ fi
 WEB_PID_FILE="$HOME/.config/locals/web.pid"
 
 if [ -f "$WEB_PID_FILE" ]; then
-    PID=$(cat "$WEB_PID_FILE")
-    if kill -0 "$PID" 2>/dev/null; then
-        kill "$PID"
-        echo "🛑 Stopped web process (PID: $PID)"
+    WEB_PID=$(cat "$WEB_PID_FILE")
+    if kill -0 "$WEB_PID" 2>/dev/null; then
+        kill "$WEB_PID"
+        echo "🛑 Stopped web process (PID: $WEB_PID)"
     else
         echo "⚠️ Web proxy was not running (stale PID file)."
     fi

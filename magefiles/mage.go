@@ -15,15 +15,29 @@ import (
 	"github.com/magefile/mage/sh"
 )
 
+// Fmt check formats
+func Fmt() error {
+	return sh.RunV("go", "fmt")
+}
+
 // Build compiles the project binary into the bin folder.
 func Build() error {
+	mg.Deps(Fmt)
 	fmt.Println("Building binary...")
 	return sh.RunV("go", "build", "-o", "bin/locals", "./main.go")
 }
 
+// Shellcheck runs the shell check
+func Shellcheck() error {
+	return sh.RunV("shellcheck", expandFiles([]string{
+		"./internal/render/testdata/darwin/*.sh",
+		"./internal/render/testdata/linux/*.sh",
+	})...)
+}
+
 // Test runs all unit tests in the project.
 func Test() error {
-	mg.Deps(Build)
+	mg.Deps(Build, Shellcheck)
 
 	fmt.Println("Running tests...")
 	cwd, err := os.Getwd()
@@ -55,7 +69,7 @@ func TestLinuxDistros() error {
 	}
 	var errs error
 	for _, image := range images {
-		if err := sh.RunV("./test/incus.sh", fmt.Sprintf("images:%s", image)); err !=nil {
+		if err := sh.RunV("./test/incus.sh", fmt.Sprintf("images:%s", image)); err != nil {
 			errs = errors.Join(errs, fmt.Errorf("image %s failed: %w", image, err))
 		}
 	}
@@ -80,4 +94,18 @@ func runVEnv(env map[string]string, cmd string, args ...string) error {
 	}
 	_, err := sh.Exec(env, stdout, stderr, cmd, args...)
 	return err
+}
+
+func expandFiles(globs []string) []string {
+	paths := []string{}
+	for _, glob := range globs {
+		matches, _ := filepath.Glob(glob)
+		for _, match := range matches {
+			f, _ := os.Stat(match)
+			if !f.IsDir() {
+				paths = append(paths, match)
+			}
+		}
+	}
+	return paths
 }
