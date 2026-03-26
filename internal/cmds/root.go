@@ -73,6 +73,8 @@ func Run(ctx context.Context, p *locals.Platform, args []string) error {
 	off := offCmd(p, cfgDir)
 	add := addCmd(p, cfgDir)
 	rm := rmCmd(p, cfgDir)
+	start := startCmd(p, cfgDir)
+	stop := stopCmd(p, cfgDir)
 	for _, c := range []*cobra.Command{on, off, add, rm} {
 		c.Flags().BoolVarP(&dryrun, "dryrun", "", false,
 			"show locals script but do not run them")
@@ -86,6 +88,8 @@ func Run(ctx context.Context, p *locals.Platform, args []string) error {
 		webCmd(ctx, p, cfgDir),
 		statusCmd(p, cfgDir),
 		envCmd(),
+		start,
+		stop,
 	)
 	return rootCmd.Execute()
 }

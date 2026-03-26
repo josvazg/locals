@@ -14,12 +14,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const (
-	probeRetries = 5
-
-	probePause = 1 * time.Second
-)
-
 func onCmd(p *locals.Platform, localsDir string) *cobra.Command {
 	return &cobra.Command{
 		Use:   "on",
@@ -48,7 +42,7 @@ func on(p *locals.Platform, localsDir string, dryrun bool) error {
 	if dryrun {
 		return show(onScript)
 	}
-	if err := run(p, onScript); err != nil {
+	if err := runScript(p, onScript); err != nil {
 		return fmt.Errorf("failed to run on.sh script: %w", err)
 	}
 	return probeServices(state.DNSListen, ":443")

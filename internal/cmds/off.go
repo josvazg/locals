@@ -38,5 +38,5 @@ func off(p *locals.Platform, localsDir string) error {
 	if dryrun {
 		return show(offScript)
 	}
-	return run(p, offScript)
+	return runScript(p, offScript)
 }

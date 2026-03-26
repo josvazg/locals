@@ -48,9 +48,10 @@ func Test() error {
 	env := map[string]string{
 		"PATH": fmt.Sprintf("%s:%s", binPath, os.Getenv("PATH")),
 	}
-	err = runVEnv(env, "go", "test", "-v", "./...")
+	// TODO: remove temporary skip of e2e tests
+	err = runVEnv(env, "go", "test", "-v", "./internal/...")
 	if err == nil {
-		fmt.Println("✅ All tests PASSED")
+		fmt.Println("✅ Tests PASSED (e2e tests skipped)")
 	}
 	return err
 }

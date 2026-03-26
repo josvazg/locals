@@ -17,6 +17,7 @@ type State struct {
 	DNSListen string
 	LocalsDir string
 	SystemCA  string
+	LocalsBin string
 }
 
 func renderTemplate(s State, name string) ([]byte, error) {

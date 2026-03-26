@@ -97,11 +97,17 @@ func (s *proxyStore) DeleteEndpoint(host string) {
 }
 
 func webCmd(ctx context.Context, p *locals.Platform, cfgDir string) *cobra.Command {
-	return &cobra.Command{
+	var logFile string
+	cmd := &cobra.Command{
 		Use:   "web [configDir]",
 		Short: "Run the locals Web reverse proxy service",
 		Args:  cobra.RangeArgs(0, 1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if logFile != "" {
+				if err := setupLog(logFile); err != nil {
+					return fmt.Errorf("failed to setup log file: %w", err)
+				}
+			}
 			webDir := DefaultConfigDir
 			if len(args) > 0 {
 				webDir = args[0]
@@ -110,6 +116,8 @@ func webCmd(ctx context.Context, p *locals.Platform, cfgDir string) *cobra.Comma
 			return runWeb(ctx, p, ensureAbsolutePath(webDir, cfgDir))
 		},
 	}
+	cmd.Flags().StringVarP(&logFile, "log", "", "", "file to log to")
+	return cmd
 }
 
 func runWeb(ctx context.Context, p *locals.Platform, webDir string) error {
