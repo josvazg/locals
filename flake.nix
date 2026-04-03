@@ -27,7 +27,7 @@
           ];
 
           shellHook = ''
-            export PATH=$PATH:$(go env GOPATH)/bin
+            export PATH=bin:$(go env GOPATH)/bin:$PATH
             export EDITOR=nvim
             export CGO_CFLAGS="-O2"
           '';
