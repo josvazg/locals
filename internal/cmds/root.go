@@ -76,6 +76,7 @@ func Run(ctx context.Context, p *locals.Platform, args []string) error {
 	start := startCmd(p, cfgDir)
 	stop := stopCmd(p, cfgDir)
 	serve := serveCmd(cfgDir)
+	unserve := unserveCmd(cfgDir)
 	for _, c := range []*cobra.Command{on, off, add, rm} {
 		c.Flags().BoolVarP(&dryrun, "dryrun", "", false,
 			"show locals script but do not run them")
@@ -92,6 +93,7 @@ func Run(ctx context.Context, p *locals.Platform, args []string) error {
 		start,
 		stop,
 		serve,
+		unserve,
 	)
 	return rootCmd.Execute()
 }

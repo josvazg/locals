@@ -34,7 +34,7 @@ func run(dryrun bool, cmd string, args ...string) error {
 
 func heredoc(dryrun bool, heredoc, filename string) error {
 	if dryrun {
-		log.Printf("echo \"%s\" | sudo tee %s", heredoc, filename)
+		log.Printf("sudo tee \"%s\" > /dev/null <<EOF\n%s\nEOF", filename, heredoc)
 	}
 	cmd := exec.Command("sudo", "tee", filename)
 	cmd.Stdin = strings.NewReader(heredoc)
