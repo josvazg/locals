@@ -7,7 +7,6 @@ import (
 	"locals/internal/render"
 	"log"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strconv"
@@ -43,14 +42,10 @@ func startCmd(p *locals.Platform, localsDir string) *cobra.Command {
 }
 
 func start(p *locals.Platform, localsDir string, dryrun bool) error {
-	localsBinary, err := findLocalsBinary()
-	if err != nil {
-		return fmt.Errorf("failed to find locals binary: %w", err)
-	}
 	state := render.State{
 		DNSListen: locals.DefaultDNSListen,
 		LocalsDir: localsDir,
-		LocalsBin: localsBinary,
+		LocalsBin: localsBinary(),
 		SystemCA:  p.Env.SystemCA(),
 	}
 	qual := ""
@@ -75,12 +70,8 @@ func start(p *locals.Platform, localsDir string, dryrun bool) error {
 	return probeServices(state.DNSListen, ":443")
 }
 
-func findLocalsBinary() (string, error) {
-	out, err := exec.Command("command", "-v", "locals").CombinedOutput()
-	if err != nil {
-		return "", fmt.Errorf("failed to find locals binary: %w", err)
-	}
-	return strings.TrimSpace(string(out)), nil
+func localsBinary() string {
+	return os.Args[0]
 }
 
 func installMkcert(dryrun bool) error {

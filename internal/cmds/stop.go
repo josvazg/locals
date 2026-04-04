@@ -16,19 +16,21 @@ import (
 
 func stopCmd(p *locals.Platform, localsDir string) *cobra.Command {
 	var dryrun bool
+	var wipe bool
 	cmd := &cobra.Command{
 		Use:   "stop",
 		Short: "Stop the web proxy and restore DNS",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
-			return stop(p, localsDir, dryrun)
+			return stop(p, localsDir, dryrun, wipe)
 		},
 	}
 	cmd.Flags().BoolVarP(&dryrun, "dryrun", "", false, "show what start would have done")
+	cmd.Flags().BoolVarP(&wipe, "wipe", "", false, "wipe the endpoints configured as well")
 	return cmd
 }
 
-func stop(p *locals.Platform, localsDir string, dryrun bool) error {
+func stop(p *locals.Platform, localsDir string, dryrun, wipe bool) error {
 	state := render.State{
 		DNSListen: locals.DefaultDNSListen,
 		LocalsDir: localsDir,
@@ -49,6 +51,11 @@ func stop(p *locals.Platform, localsDir string, dryrun bool) error {
 	}
 	if err := uninstallMkcert(dryrun); err != nil {
 		return fmt.Errorf("failed to %sinstall mkcert: %w", qual, err)
+	}
+	if wipe {
+		if err := run(dryrun, "rm", filepath.Join(localsDir, "web", "*.json")); err != nil {
+			return fmt.Errorf("failed to %swipe endpoint configs: %w", qual, err)
+		}
 	}
 	return nil
 }

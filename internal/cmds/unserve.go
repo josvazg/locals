@@ -36,6 +36,6 @@ func unserve(dryrun bool, domain, localsDir string) error {
 	if err := run(dryrun, "rm", "-rf", certFile, keyFile); err != nil {
 		return fmt.Errorf("failed to remove domain %s keys and certificates: %w", domain, err)
 	}
-	log.Printf("▶️ Removed access to %s", domain)
+	log.Printf("⏹️ Removed access to %s", domain)
 	return nil
 }

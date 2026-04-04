@@ -27,8 +27,10 @@ func run(dryrun bool, cmd string, args ...string) error {
 	}
 	out, err := exec.Command(cmd, args...).CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("%s: %w", string(out), err)
+		fullCommand := append([]string{cmd}, args...)
+		return fmt.Errorf("%v\n%s: %w", strings.Join(fullCommand, " "), string(out), err)
 	}
+	fmt.Print(string(out))
 	return nil
 }
 

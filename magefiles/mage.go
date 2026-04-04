@@ -44,14 +44,12 @@ func Test() error {
 	if err != nil {
 		return fmt.Errorf("failed to get current working dir")
 	}
-	binPath := filepath.Join(cwd, "bin")
 	env := map[string]string{
-		"PATH": fmt.Sprintf("%s:%s", binPath, os.Getenv("PATH")),
+		"LOCALSBIN": filepath.Join(cwd, "bin", "locals"),
 	}
-	// TODO: remove temporary skip of e2e tests
-	err = runVEnv(env, "go", "test", "-v", "./internal/...")
+	err = runVEnv(env, "go", "test", "-v", "./...")
 	if err == nil {
-		fmt.Println("✅ Tests PASSED (e2e tests skipped)")
+		fmt.Println("✅ Tests PASSED")
 	}
 	return err
 }
