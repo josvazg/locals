@@ -12,19 +12,28 @@
       let
         pkgs = import nixpkgs { inherit system; };
         unstable = import nixpkgs-unstable { inherit system; };
+	testDeps = with pkgs; [
+          mage
+          shellcheck
+          git
+          curl
+          unstable.go
+	  mkcert
+        ];
       in {
+        apps.test = {
+	        type = "app";
+          program = "${pkgs.writeShellScriptBin "mage-test" ''
+            export PATH=${pkgs.lib.makeBinPath testDeps}:$PATH
+            # Run the actual mage command with sudo here
+            sudo -E ${pkgs.mage}/bin/mage "$@"
+          ''}/bin/mage-test";
+        };
+
         devShells.default = pkgs.mkShell {
           name = "locals";
 
-          buildInputs = with pkgs; [
-            curl
-            git
-            mage
-            shellcheck
-            neovim
-            mkcert
-            unstable.go
-          ];
+          buildInputs = testDeps ++ [ pkgs.neovim ] ;
 
           shellHook = ''
             export PATH=bin:$(go env GOPATH)/bin:$PATH

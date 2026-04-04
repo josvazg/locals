@@ -20,33 +20,8 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          cache: true # Speeds up subsequent runs by caching Go modules
-          go-version: '1.25'
-
-      - name: Install System Dependencies (Ubuntu)
-        if: matrix.os == 'ubuntu-latest'
-        run: |
-          sudo apt-get update
-          sudo apt-get install libnss3-tools -y
-
-      - name: Install mkcert and Mage via Go
-        run: |
-          go install filippo.io/mkcert@latest
-          go install github.com/magefile/mage@latest
-          # Add the Go bin directory to the GitHub Path for this job
-          echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
-
-      - name: Install Tools via Go
-        run: |
-          go install filippo.io/mkcert@latest
-          go install github.com/magefile/mage@latest
-          # Store the path for use in the next step
-          echo "GOBIN=$(go env GOPATH)/bin" >> $GITHUB_ENV
+      - name: Install Nix
+        uses: nixbuild/nix-quick-install-action@v30
 
       - name: Run Mage Tests
-        # Using sudo $(which mage) ensures the root user finds the binary 
-        # even if the environment PATH is restricted under sudo.
-        run: sudo env "PATH=$PATH:${{ env.GOBIN }}" ${{ env.GOBIN }}/mage -v test
+        run: nix --extra-experimental-features "nix-command flakes" run .#test -- -v test
