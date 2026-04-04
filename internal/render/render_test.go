@@ -24,8 +24,8 @@ func TestRenderScripts(t *testing.T) {
 		renderFn   func(State) ([]byte, error)
 		goldenFile string
 	}{
-		{"On Script DNSMasq", On, "on.sh"},
-		{"Off Script DNSMasq", Off, "off.sh"},
+		{"On Script", On, "on.sh"},
+		{"Off Script", Off, "off.sh"},
 		{"Add Script", Add, "add.sh"},
 		{"Remove Script", Remove, "rm.sh"},
 	}

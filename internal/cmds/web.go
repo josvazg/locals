@@ -170,7 +170,10 @@ func ensureAbsolutePath(dir, cfgDir string) string {
 
 func loadConfig(p *locals.Platform, store ProxyStore, webDir string) error {
 	log.Printf("loading web configs from %s", webDir)
-	files, _ := filepath.Glob(filepath.Join(webDir, "*.json"))
+	files, err := filepath.Glob(filepath.Join(webDir, "*.json"))
+	if err != nil {
+		return fmt.Errorf("failed to list web JSON files: %w", err)
+	}
 	hosts := map[string]struct{}{}
 	for _, f := range files {
 		data, _ := p.IO.ReadFile(f)

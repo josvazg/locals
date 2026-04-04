@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -70,7 +71,7 @@ func probeDNS(dnsListen string) error {
 	d := net.Dialer{Timeout: 2 * time.Second}
 	conn, err := d.Dial("udp", completeAddress(dnsListen, 53))
 	if err != nil {
-		return fmt.Errorf("probe failed, check failure at /tmp/locals-dns.log: %w", err)
+		return fmt.Errorf("probe failed, check failure at %s/locals-dns.log: %w", os.TempDir(), err)
 	}
 	defer conn.Close()
 	return nil
@@ -79,7 +80,7 @@ func probeDNS(dnsListen string) error {
 func probeWeb(webListen string) error {
 	conn, err := net.DialTimeout("tcp", completeAddress(webListen, 443), 2*time.Second)
 	if err != nil {
-		return fmt.Errorf("probe failed, check failure at /tmp/locals-web.log: %w", err)
+		return fmt.Errorf("probe failed, check failure at %s/locals-web.log: %w", os.TempDir(), err)
 	}
 	defer conn.Close()
 	return nil

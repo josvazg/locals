@@ -53,8 +53,14 @@ func stop(p *locals.Platform, localsDir string, dryrun, wipe bool) error {
 		return fmt.Errorf("failed to %sinstall mkcert: %w", qual, err)
 	}
 	if wipe {
-		if err := run(dryrun, "rm", filepath.Join(localsDir, "web", "*.json")); err != nil {
-			return fmt.Errorf("failed to %swipe endpoint configs: %w", qual, err)
+		files, err := filepath.Glob(filepath.Join(state.LocalsDir, "web", "*.json"))
+		if err != nil {
+			return fmt.Errorf("failed to list web JSON files: %w", err)
+		}
+		for _, file := range files {
+			if err := safeSudoRemoves(dryrun, file); err != nil {
+				return fmt.Errorf("failed to %swipe endpoint configs: %w", qual, err)
+			}
 		}
 	}
 	return nil
@@ -64,7 +70,21 @@ func unconfigureDNS(state *render.State, dryrun bool) error {
 	if runtime.GOOS == "darwin" {
 		return unconfigureMacDNS(state, dryrun)
 	}
-	panic("unsupported")
+	return unconfigureLinuxDNS(state, dryrun)
+}
+
+func unconfigureLinuxDNS(state *render.State, dryrun bool) error {
+	if runOk("mountpoint", "-q", "/etc/resolv.conf") {
+		if err := run(dryrun, "sudo", "umount", "/etc/resolv.conf"); err != nil {
+			return fmt.Errorf("failed to undo mount bind on /etc/resolve.conf: %w", err)
+		}
+	} else {
+		log.Printf("ℹ️ /etc/resolv.conf was not mounted.")
+	}
+	if err := safeSudoRemoves(dryrun, resolvedConf); err != nil {
+		return fmt.Errorf("failed to remove resolved config: %w", err)
+	}
+	return nil
 }
 
 func unconfigureMacDNS(state *render.State, dryrun bool) error {
@@ -73,10 +93,7 @@ func unconfigureMacDNS(state *render.State, dryrun bool) error {
 			return fmt.Errorf("failed to remove lo0 DNS redirect: %w", err)
 		}
 	}
-	if strings.HasSuffix(strings.TrimSpace(resolverMacLocalsFile), "/") {
-		panic(fmt.Sprintf("dangerous resolverMacLocalsFile value: %s", resolverMacConfigDir))
-	}
-	if err := run(dryrun, "sudo", "rm", "-f", resolverMacLocalsFile); err != nil {
+	if err := safeSudoRemoves(dryrun, resolverMacLocalsFile); err != nil {
 		return fmt.Errorf("failed to remove locals resolver file %q: %w",
 			resolverMacLocalsFile, err)
 	}

@@ -28,12 +28,12 @@ func unserveCmd(localsDir string) *cobra.Command {
 
 func unserve(dryrun bool, domain, localsDir string) error {
 	domainCfgFile := filepath.Join(localsDir, "web", fmt.Sprintf("%s.json", domain))
-	if err := run(dryrun, "rm", "-rf", domainCfgFile); err != nil {
+	if err := safeSudoRemoves(dryrun, domainCfgFile); err != nil {
 		return fmt.Errorf("failed to remove domain %s config file: %w", domain, err)
 	}
 	certFile := filepath.Join(localsDir, "certs", fmt.Sprintf("%s.pem", domain))
 	keyFile := filepath.Join(localsDir, "certs", fmt.Sprintf("%s-key.pem", domain))
-	if err := run(dryrun, "rm", "-rf", certFile, keyFile); err != nil {
+	if err := safeSudoRemoves(dryrun, certFile, keyFile); err != nil {
 		return fmt.Errorf("failed to remove domain %s keys and certificates: %w", domain, err)
 	}
 	log.Printf("⏹️ Removed access to %s", domain)

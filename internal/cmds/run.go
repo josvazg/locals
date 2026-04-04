@@ -34,6 +34,20 @@ func run(dryrun bool, cmd string, args ...string) error {
 	return nil
 }
 
+func runOk(cmd string, args ...string) bool {
+	return run(false, cmd, args...) == nil
+}
+
+func safeSudoRemoves(dryrun bool, filenames ...string) error {
+	for _, filename := range filenames {
+		if strings.HasSuffix(strings.TrimSpace(filename), "/") {
+			return fmt.Errorf("refusing unsafe removal of possible dir %q", filename)
+		}
+	}
+	rmArgs := append([]string{"sudo", "rm", "-f"}, filenames...)
+	return run(dryrun, "sudo", rmArgs...)
+}
+
 func heredoc(dryrun bool, heredoc, filename string) error {
 	if dryrun {
 		log.Printf("sudo tee \"%s\" > /dev/null <<EOF\n%s\nEOF", filename, heredoc)

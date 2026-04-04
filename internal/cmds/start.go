@@ -25,6 +25,8 @@ const (
 	resolverMacConfigDir = "/etc/resolver"
 
 	resolverMacLocalsFile = "/etc/resolver/locals"
+
+	resolvedConf = "/etc/systemd/resolved.conf.d/locals.conf"
 )
 
 func startCmd(p *locals.Platform, localsDir string) *cobra.Command {
@@ -111,7 +113,7 @@ func configureDNS(state *render.State, dryrun bool) error {
 	if runtime.GOOS == "darwin" {
 		return configureMacDNS(state, dryrun)
 	}
-	panic("unsupported")
+	return configureLinuxDNS(state, dryrun)
 }
 
 func configureMacDNS(state *render.State, dryrun bool) error {
@@ -132,6 +134,44 @@ func configureMacDNS(state *render.State, dryrun bool) error {
 	return nil
 }
 
+func configureLinuxDNS(state *render.State, dryrun bool) error {
+	if pathExists("/run/systemd/resolve") && runOk("systemctl", "is-active", "systemd-resolved") {
+		return configureLinuxResolved(state, dryrun)
+	}
+	log.Printf("📡 systemd-resolved not found. Falling back to /etc/resolv.conf bind-mount.")
+	return configureLinuxBindMount(state, dryrun)
+}
+
+func configureLinuxResolved(state *render.State, dryrun bool) error {
+	log.Printf("📡 systemd-resolved detected. Using Routing Domain setup.")
+	localsResolvedCfg := fmt.Sprintf("[Resolve]\nDNS=%s\nDomains=~locals\n", state.DNSListen)
+	if err := heredoc(dryrun, localsResolvedCfg, resolvedConf); err != nil {
+		return fmt.Errorf("failed to configure locals resolved: %w", err)
+	}
+	if err := run(dryrun, "sudo", "systemctl", "restart", "systemd-resolved"); err != nil {
+		return fmt.Errorf("failed to restart systemd resolved: %w", err)
+	}
+	log.Printf("🔒 systemd-resolved configured to route .locals to %s", state.DNSListen)
+	return nil
+}
+
+func configureLinuxBindMount(state *render.State, dryrun bool) error {
+	if runOk("mountpoint", "-q", "/etc/resolv.conf") {
+        log.Printf("⚠️ /etc/resolv.conf already replaced. Skipping.")
+		return nil
+	}
+	resolvConfLocal := filepath.Join(state.LocalsDir, "resolv.patched.conf")
+	resolvCfg := fmt.Sprintf("nameserver %s\noptions edns0 trust-ad", state.DNSListen)
+	if err := heredoc(dryrun, resolvCfg, resolvConfLocal); err != nil {
+		return fmt.Errorf("failed to create alternate resolv.conf: %w", err)
+	}
+	if err := run(dryrun, "sudo", "mount", "--bind", resolvConfLocal, "/etc/resolv.conf"); err != nil {
+		return fmt.Errorf("failed to bind mount /etc/resolv.conf: %w", err)
+	}
+    log.Printf("🔒 /etc/resolv.conf mounted to redirect DNS queries to locals dns first")
+	return nil
+}
+
 func launchWeb(state *render.State, dryrun bool) error {
 	pidFile := filepath.Join(state.LocalsDir, "web.pid")
 	if pid := readPIDFromFile(pidFile); pid >= 0 {
@@ -144,8 +184,9 @@ func launchWeb(state *render.State, dryrun bool) error {
 			return fmt.Errorf("failed to remove PID file %q: %w", pidFile, err)
 		}
 	}
-	pid, err := launch(dryrun, "sudo", "nohup", state.LocalsBin,
-		"web", "--log", filepath.Join(os.TempDir(), "locals-web.log"))
+	webCfg := filepath.Join(state.LocalsDir, "web")
+	pid, err := launch(dryrun, "sudo", "nohup", state.LocalsBin, "web",
+		webCfg, "--log", filepath.Join(os.TempDir(), "locals-web.log"))
 	if err != nil {
 		return fmt.Errorf("failed to launch embedded web server: %w", err)
 	}
@@ -172,5 +213,10 @@ func readPIDFromFile(pidFile string) int {
 func processExistsForPID(pid int) bool {
 	process, _ := os.FindProcess(pid)
 	err := process.Signal(syscall.Signal(0))
+	return err == nil
+}
+
+func pathExists(path string) bool {
+	_, err := os.Stat(path)
 	return err == nil
 }
