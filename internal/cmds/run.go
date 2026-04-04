@@ -25,16 +25,24 @@ func run(dryrun bool, cmd string, args ...string) error {
 		log.Printf("%s", cli)
 		return nil
 	}
-	out, err := exec.Command(cmd, args...).CombinedOutput()
+	out, err := readOutput(cmd, args...)
 	if err != nil {
-		fullCommand := append([]string{cmd}, args...)
-		return fmt.Errorf("%v\n%s: %w", strings.Join(fullCommand, " "), string(out), err)
+		return err
 	}
-	fmt.Print(string(out))
+	fmt.Print(out)
 	return nil
 }
 
-func runOk(cmd string, args ...string) bool {
+func readOutput(cmd string, args ...string) (string, error) {
+	out, err := exec.Command(cmd, args...).CombinedOutput()
+	if err != nil {
+		fullCommand := append([]string{cmd}, args...)
+		return "", fmt.Errorf("%v\n%s: %w", strings.Join(fullCommand, " "), string(out), err)
+	}
+	return string(out), nil
+}
+
+func test(cmd string, args ...string) bool {
 	return run(false, cmd, args...) == nil
 }
 
@@ -51,6 +59,7 @@ func safeSudoRemoves(dryrun bool, filenames ...string) error {
 func heredoc(dryrun bool, heredoc, filename string) error {
 	if dryrun {
 		log.Printf("sudo tee \"%s\" > /dev/null <<EOF\n%s\nEOF", filename, heredoc)
+		return nil
 	}
 	cmd := exec.Command("sudo", "tee", filename)
 	cmd.Stdin = strings.NewReader(heredoc)
@@ -63,6 +72,7 @@ func launch(dryrun bool, cmd string, args ...string) (int, error) {
 	cli := strings.Join(append([]string{cmd}, args...), " ")
 	if dryrun {
 		log.Printf("%s", cli)
+		return -1, nil
 	}
 	command := exec.Command(cmd, args...)
 	if err := command.Start(); err != nil {

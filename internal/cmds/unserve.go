@@ -19,6 +19,9 @@ func unserveCmd(localsDir string) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 			domain := args[0]
+			if dryrun {
+				log.Printf("DRYRUN")
+			}
 			return unserve(dryrun, domain, localsDir)
 		},
 	}

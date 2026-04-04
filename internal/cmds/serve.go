@@ -29,6 +29,9 @@ func serveCmd(localsDir string) *cobra.Command {
 			cmd.SilenceUsage = true
 			domain := args[0]
 			targetURL := args[1]
+			if dryrun {
+				log.Printf("DRYRUN")
+			}
 			return serve(localsDir, domain, targetURL, dryrun)
 		},
 	}

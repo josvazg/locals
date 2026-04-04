@@ -22,6 +22,9 @@ func stopCmd(p *locals.Platform, localsDir string) *cobra.Command {
 		Short: "Stop the web proxy and restore DNS",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
+			if dryrun {
+				log.Printf("DRYRUN")
+			}
 			return stop(p, localsDir, dryrun, wipe)
 		},
 	}
@@ -70,17 +73,18 @@ func unconfigureDNS(state *render.State, dryrun bool) error {
 	if runtime.GOOS == "darwin" {
 		return unconfigureMacDNS(state, dryrun)
 	}
-	return unconfigureLinuxDNS(state, dryrun)
+	return unconfigureLinuxDNS(dryrun)
 }
 
-func unconfigureLinuxDNS(state *render.State, dryrun bool) error {
-	if runOk("mountpoint", "-q", "/etc/resolv.conf") {
+func unconfigureLinuxDNS(dryrun bool) error {
+	if test("mountpoint", "-q", "/etc/resolv.conf") {
 		if err := run(dryrun, "sudo", "umount", "/etc/resolv.conf"); err != nil {
 			return fmt.Errorf("failed to undo mount bind on /etc/resolve.conf: %w", err)
 		}
 	} else {
 		log.Printf("ℹ️ /etc/resolv.conf was not mounted.")
 	}
+	resolvedConf := filepath.Join(resolverConfDir, "locals.conf")
 	if err := safeSudoRemoves(dryrun, resolvedConf); err != nil {
 		return fmt.Errorf("failed to remove resolved config: %w", err)
 	}

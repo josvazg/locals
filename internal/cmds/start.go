@@ -26,7 +26,7 @@ const (
 
 	resolverMacLocalsFile = "/etc/resolver/locals"
 
-	resolvedConf = "/etc/systemd/resolved.conf.d/locals.conf"
+	resolverConfDir = "/etc/systemd/resolved.conf.d"
 )
 
 func startCmd(p *locals.Platform, localsDir string) *cobra.Command {
@@ -36,6 +36,9 @@ func startCmd(p *locals.Platform, localsDir string) *cobra.Command {
 		Short: "Start the web proxy and grab DNS",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
+			if dryrun {
+				log.Printf("DRYRUN")
+			}
 			return start(p, localsDir, dryrun)
 		},
 	}
@@ -44,10 +47,14 @@ func startCmd(p *locals.Platform, localsDir string) *cobra.Command {
 }
 
 func start(p *locals.Platform, localsDir string, dryrun bool) error {
+	localsBin, err := localsBinary()
+	if err != nil {
+		return fmt.Errorf("failed to resolve path to locals: %w", err)
+	}
 	state := render.State{
 		DNSListen: locals.DefaultDNSListen,
 		LocalsDir: localsDir,
-		LocalsBin: localsBinary(),
+		LocalsBin: localsBin,
 		SystemCA:  p.Env.SystemCA(),
 	}
 	qual := ""
@@ -72,8 +79,16 @@ func start(p *locals.Platform, localsDir string, dryrun bool) error {
 	return probeServices(state.DNSListen, ":443")
 }
 
-func localsBinary() string {
-	return os.Args[0]
+func localsBinary() (string, error) {
+	binary := os.Args[0]
+	if pathExists(binary) {
+		return binary, nil
+	}
+	binPath, err := readOutput("command", "-v", "locals")
+	if err != nil {
+		return "", fmt.Errorf("failed to find locals binary path: %w", err)
+	}
+	return binPath, nil
 }
 
 func installMkcert(dryrun bool) error {
@@ -135,7 +150,7 @@ func configureMacDNS(state *render.State, dryrun bool) error {
 }
 
 func configureLinuxDNS(state *render.State, dryrun bool) error {
-	if pathExists("/run/systemd/resolve") && runOk("systemctl", "is-active", "systemd-resolved") {
+	if pathExists("/run/systemd/resolve") && test("systemctl", "is-active", "systemd-resolved") {
 		return configureLinuxResolved(state, dryrun)
 	}
 	log.Printf("📡 systemd-resolved not found. Falling back to /etc/resolv.conf bind-mount.")
@@ -145,6 +160,10 @@ func configureLinuxDNS(state *render.State, dryrun bool) error {
 func configureLinuxResolved(state *render.State, dryrun bool) error {
 	log.Printf("📡 systemd-resolved detected. Using Routing Domain setup.")
 	localsResolvedCfg := fmt.Sprintf("[Resolve]\nDNS=%s\nDomains=~locals\n", state.DNSListen)
+	if !pathExists(resolverConfDir) {
+		run(dryrun, "mkdir", "-p", resolverConfDir)
+	}
+	resolvedConf := filepath.Join(resolverConfDir, "locals.conf")
 	if err := heredoc(dryrun, localsResolvedCfg, resolvedConf); err != nil {
 		return fmt.Errorf("failed to configure locals resolved: %w", err)
 	}
@@ -156,8 +175,8 @@ func configureLinuxResolved(state *render.State, dryrun bool) error {
 }
 
 func configureLinuxBindMount(state *render.State, dryrun bool) error {
-	if runOk("mountpoint", "-q", "/etc/resolv.conf") {
-        log.Printf("⚠️ /etc/resolv.conf already replaced. Skipping.")
+	if test("mountpoint", "-q", "/etc/resolv.conf") {
+		log.Printf("⚠️ /etc/resolv.conf already replaced. Skipping.")
 		return nil
 	}
 	resolvConfLocal := filepath.Join(state.LocalsDir, "resolv.patched.conf")
@@ -168,7 +187,7 @@ func configureLinuxBindMount(state *render.State, dryrun bool) error {
 	if err := run(dryrun, "sudo", "mount", "--bind", resolvConfLocal, "/etc/resolv.conf"); err != nil {
 		return fmt.Errorf("failed to bind mount /etc/resolv.conf: %w", err)
 	}
-    log.Printf("🔒 /etc/resolv.conf mounted to redirect DNS queries to locals dns first")
+	log.Printf("🔒 /etc/resolv.conf mounted to redirect DNS queries to locals dns first")
 	return nil
 }
 

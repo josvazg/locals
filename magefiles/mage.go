@@ -37,7 +37,7 @@ func Shellcheck() error {
 
 // Test runs all unit tests in the project.
 func Test() error {
-	mg.Deps(Build, Shellcheck)
+	mg.Deps(Build)
 
 	fmt.Println("Running tests...")
 	cwd, err := os.Getwd()
@@ -63,12 +63,13 @@ func TestLinuxDistros() error {
 		"archlinux",
 		"debian/14",
 		"ubuntu/25.04",
-		"fedora/41",
+		"fedora/43",
 		"nixos/25.11",
 	}
 	var errs error
 	for _, image := range images {
-		if err := sh.RunV("./test/incus.sh", fmt.Sprintf("images:%s", image)); err != nil {
+		imgRef := fmt.Sprintf("images:%s", image)
+		if err := sh.RunV("./test/incus.sh", imgRef, "mage", "-v", "test"); err != nil {
 			errs = errors.Join(errs, fmt.Errorf("image %s failed: %w", image, err))
 		}
 	}
