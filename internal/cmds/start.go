@@ -26,7 +26,7 @@ const (
 
 	resolverMacLocalsFile = "/etc/resolver/locals"
 
-	resolverConfDir = "/etc/systemd/resolved.conf.d"
+	resolverConf = "/etc/systemd/resolved.conf.d/locals.conf"
 )
 
 func startCmd(p *locals.Platform, localsDir string) *cobra.Command {
@@ -120,7 +120,7 @@ func launchDNS(state *render.State, dryrun bool) error {
 	if err := os.WriteFile(pidFile, ([]byte)(fmt.Sprintf("%d", pid)), 0640); err != nil {
 		return fmt.Errorf("failed to write the embedded DNS server PID file: %w", err)
 	}
-	log.Printf("✅ locals DNS started on %s (PID: %d))", state.DNSListen, pid)
+	log.Printf("✅ locals DNS started on %s (PID: %d)", state.DNSListen, pid)
 	return nil
 }
 
@@ -138,9 +138,6 @@ func configureMacDNS(state *render.State, dryrun bool) error {
 		if err != nil {
 			return fmt.Errorf("failed to set lo0 DNS redirect: %w", err)
 		}
-	}
-	if err := run(dryrun, "mkdir", "-p", resolverMacConfigDir); err != nil {
-		return fmt.Errorf("failed to mkdir the resovler dir: %w", err)
 	}
 	resolverCfg := fmt.Sprintf("nameserver %s\nport 53\n", state.DNSListen)
 	if err := heredoc(dryrun, resolverCfg, resolverMacLocalsFile); err != nil {
@@ -160,11 +157,7 @@ func configureLinuxDNS(state *render.State, dryrun bool) error {
 func configureLinuxResolved(state *render.State, dryrun bool) error {
 	log.Printf("📡 systemd-resolved detected. Using Routing Domain setup.")
 	localsResolvedCfg := fmt.Sprintf("[Resolve]\nDNS=%s\nDomains=~locals\n", state.DNSListen)
-	if !pathExists(resolverConfDir) {
-		run(dryrun, "mkdir", "-p", resolverConfDir)
-	}
-	resolvedConf := filepath.Join(resolverConfDir, "locals.conf")
-	if err := heredoc(dryrun, localsResolvedCfg, resolvedConf); err != nil {
+	if err := heredoc(dryrun, localsResolvedCfg, resolverConf); err != nil {
 		return fmt.Errorf("failed to configure locals resolved: %w", err)
 	}
 	if err := run(dryrun, "sudo", "systemctl", "restart", "systemd-resolved"); err != nil {
@@ -212,7 +205,7 @@ func launchWeb(state *render.State, dryrun bool) error {
 	if err := os.WriteFile(pidFile, ([]byte)(fmt.Sprintf("%d", pid)), 0640); err != nil {
 		return fmt.Errorf("failed to write the embedded web server PID file: %w", err)
 	}
-	log.Printf("✅ locals web started on %s (PID: %d))", state.DNSListen, pid)
+	log.Printf("✅ locals web started on %s (PID: %d)", state.DNSListen, pid)
 	return nil
 }
 

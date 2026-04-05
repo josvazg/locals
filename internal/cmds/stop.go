@@ -84,8 +84,7 @@ func unconfigureLinuxDNS(dryrun bool) error {
 	} else {
 		log.Printf("ℹ️ /etc/resolv.conf was not mounted.")
 	}
-	resolvedConf := filepath.Join(resolverConfDir, "locals.conf")
-	if err := safeSudoRemoves(dryrun, resolvedConf); err != nil {
+	if err := safeSudoRemoves(dryrun, resolverConf); err != nil {
 		return fmt.Errorf("failed to remove resolved config: %w", err)
 	}
 	return nil
