@@ -42,5 +42,5 @@ func add(p *locals.Platform, localsDir, domain, targetURL string) error {
 	if dryrun {
 		return show(addScript, domain, targetURL)
 	}
-	return run(p, addScript, domain, targetURL)
+	return runScript(p, addScript, domain, targetURL)
 }

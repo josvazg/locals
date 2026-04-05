@@ -16,6 +16,6 @@ func main() {
 	defer stop()
 
 	if err := cmds.Run(ctx, locals.RealOSPlatform(), os.Args[1:]); err != nil {
-		log.Printf("locals failed: %v", err)
+		log.Fatalf("locals failed: %v", err)
 	}
 }

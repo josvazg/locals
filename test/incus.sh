@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 NODE_NAME="test-$(date +%s)"
 IMAGE=$1 # e.g., "images:archlinux" or "images:fedora/40"
-SHELL=${2:-test/distro.sh}
+shift
 
 if [ -z "$IMAGE" ]; then
   echo "Usage: $0 <image_name> [<shell_script>]"
@@ -22,8 +22,8 @@ sleep 5
 incus config device add "$NODE_NAME" project-src disk source=$(pwd) path=/src
 
 # 4. Install dependencies and run tests
-incus exec "$NODE_NAME" -- sh -c "/src/${SHELL}"
+SAFE_ARGS=$(printf "%q " "$@")
+incus exec "$NODE_NAME" -- sh -c "/src/test/distro.sh $SAFE_ARGS"
 
 # 5. Cleanup (optional)
 incus delete -f "$NODE_NAME"
-

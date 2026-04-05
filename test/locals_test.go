@@ -30,14 +30,24 @@ const (
 	DefaultLocals = "locals"
 )
 
+var localsBinary = DefaultLocals
+
 func TestLocals(t *testing.T) {
 	ctx, _ := signal.NotifyContext(context.Background(), syscall.SIGTERM)
 	servers := startTestServers(t, NumberOfTestServers)
 	defer stopTestServers(t, servers)
 	testSudo(ctx, t)
+	localsBinary = envOrDefault("LOCALSBIN", DefaultLocals)
 	testInactive(ctx, t)
-	testOn(ctx, t)
+	testStart(ctx, t)
 	testActive(ctx, t)
+	for _, filename := range []string{"locals-dns.log", "locals-web.log"} {
+		out, err := os.ReadFile(filepath.Join(os.TempDir(), filename))
+		if err != nil {
+			fmt.Printf("failed to read %q: %v", filename, err)
+		}
+		fmt.Printf("%s:\n%v", filename, string(out))
+	}
 	testAdds(ctx, t, servers)
 	testServers(ctx, t, servers)
 	testRemovals(ctx, t, servers)
@@ -88,9 +98,9 @@ func testInactive(ctx context.Context, t *testing.T) {
 	testCmd(ctx, t, loadFile(t, "inactive.out"), "status")
 }
 
-func testOn(ctx context.Context, t *testing.T) {
+func testStart(ctx context.Context, t *testing.T) {
 	t.Helper()
-	testCmd(ctx, t, loadFile(t, "on.out"), "on")
+	testCmd(ctx, t, loadFile(t, "on.out"), "start")
 }
 
 func testActive(ctx context.Context, t *testing.T) {
@@ -106,7 +116,7 @@ func testAdds(ctx context.Context, t *testing.T, servers []*httptest.Server) {
 		endpoint := server.Listener.Addr().String()
 		url := serviceURL(portFrom(endpoint))
 		serviceList = fmt.Sprintf("%s  🔗 %s -> %s\n", serviceList, url, endpoint)
-		testCmd(ctx, t, addContent, "add", url, endpoint)
+		testCmd(ctx, t, addContent, "serve", url, endpoint)
 	}
 	added := loadFile(t, "active.out")
 	patchedAdded := strings.Replace(added, `  \(none\)`, serviceList[:len(serviceList)-1], 1)
@@ -159,7 +169,7 @@ func testRemovals(ctx context.Context, t *testing.T, servers []*httptest.Server)
 	for _, server := range sortByPort(servers) {
 		endpoint := server.Listener.Addr().String()
 		url := fmt.Sprintf("service-%s.locals", portFrom(endpoint))
-		testCmd(ctx, t, addContent, "rm", url)
+		testCmd(ctx, t, addContent, "unserve", url)
 	}
 }
 
@@ -181,7 +191,7 @@ func sortByPort(servers []*httptest.Server) []*httptest.Server {
 
 func testOff(ctx context.Context, t *testing.T) {
 	t.Helper()
-	testCmd(ctx, t, loadFile(t, "off.out"), "off")
+	testCmd(ctx, t, loadFile(t, "off.out"), "stop")
 }
 
 func loadFile(t *testing.T, filename string) string {
@@ -194,12 +204,13 @@ func testCmd(ctx context.Context, t *testing.T, want string, args ...string) {
 	t.Helper()
 
 	got, err := runLocals(ctx, args...)
-	require.NoError(t, err)
+	require.NoError(t, err, "failed to test command: %v\n got %v",
+		strings.Join(args, " "), string(got))
 	assert.Regexp(t, regexp.MustCompile(string(want)), string(got))
 }
 
 func runLocals(ctx context.Context, args ...string) ([]byte, error) {
-	cmd := exec.CommandContext(ctx, DefaultLocals, args...)
+	cmd := exec.CommandContext(ctx, localsBinary, args...)
 	return cmd.CombinedOutput()
 }
 
@@ -209,4 +220,12 @@ func mkcertCARoot(ctx context.Context, t *testing.T) string {
 	out, err := exec.CommandContext(ctx, "mkcert", "-CAROOT").Output()
 	require.NoError(t, err)
 	return strings.TrimSpace(string(out))
+}
+
+func envOrDefault(name, defaultValue string) string {
+	value := os.Getenv(name)
+	if value == "" {
+		value = defaultValue
+	}
+	return value
 }

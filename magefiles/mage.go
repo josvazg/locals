@@ -15,10 +15,24 @@ import (
 	"github.com/magefile/mage/sh"
 )
 
+// Fmt check formats
+func Fmt() error {
+	return sh.RunV("go", "fmt")
+}
+
 // Build compiles the project binary into the bin folder.
 func Build() error {
+	mg.Deps(Fmt)
 	fmt.Println("Building binary...")
 	return sh.RunV("go", "build", "-o", "bin/locals", "./main.go")
+}
+
+// Shellcheck runs the shell check
+func Shellcheck() error {
+	return sh.RunV("shellcheck", expandFiles([]string{
+		"./internal/render/testdata/darwin/*.sh",
+		"./internal/render/testdata/linux/*.sh",
+	})...)
 }
 
 // Test runs all unit tests in the project.
@@ -30,13 +44,12 @@ func Test() error {
 	if err != nil {
 		return fmt.Errorf("failed to get current working dir")
 	}
-	binPath := filepath.Join(cwd, "bin")
 	env := map[string]string{
-		"PATH": fmt.Sprintf("%s:%s", binPath, os.Getenv("PATH")),
+		"LOCALSBIN": filepath.Join(cwd, "bin", "locals"),
 	}
-	err = runVEnv(env, "go", "test", "-v", "./...")
+	err = runVEnv(env, "go", "test", "-v", "-timeout", "2m", "./...")
 	if err == nil {
-		fmt.Println("✅ All tests PASSED")
+		fmt.Println("✅ Tests PASSED")
 	}
 	return err
 }
@@ -50,12 +63,13 @@ func TestLinuxDistros() error {
 		"archlinux",
 		"debian/14",
 		"ubuntu/25.04",
-		"fedora/41",
+		"fedora/43",
 		"nixos/25.11",
 	}
 	var errs error
 	for _, image := range images {
-		if err := sh.RunV("./test/incus.sh", fmt.Sprintf("images:%s", image)); err !=nil {
+		imgRef := fmt.Sprintf("images:%s", image)
+		if err := sh.RunV("./test/incus.sh", imgRef, "mage", "-v", "test"); err != nil {
 			errs = errors.Join(errs, fmt.Errorf("image %s failed: %w", image, err))
 		}
 	}
@@ -80,4 +94,18 @@ func runVEnv(env map[string]string, cmd string, args ...string) error {
 	}
 	_, err := sh.Exec(env, stdout, stderr, cmd, args...)
 	return err
+}
+
+func expandFiles(globs []string) []string {
+	paths := []string{}
+	for _, glob := range globs {
+		matches, _ := filepath.Glob(glob)
+		for _, match := range matches {
+			f, _ := os.Stat(match)
+			if !f.IsDir() {
+				paths = append(paths, match)
+			}
+		}
+	}
+	return paths
 }

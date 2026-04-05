@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
-	"net"
 	"os"
 	"os/exec"
 	"runtime"
@@ -13,6 +12,7 @@ import (
 	"syscall"
 
 	"locals/internal/env"
+	"locals/internal/platform"
 )
 
 // --- CONFIGURATION ---
@@ -189,7 +189,7 @@ func checkMacDNSSetup() *DNSStatus {
 	dnsMode := ""
 	dnsConfig, err := os.ReadFile("/etc/resolver/locals")
 	hasFile := err == nil && len(dnsConfig) > 0
-	hasAlias := isIPOnInterface("lo0", DefaultDNSListen)
+	hasAlias := platform.IsIPOnInterface("lo0", DefaultDNSListen)
 
 	switch {
 	case hasFile && hasAlias:
@@ -205,23 +205,4 @@ func checkMacDNSSetup() *DNSStatus {
 		Active: hasFile && hasAlias,
 		Status: dnsMode,
 	}
-}
-
-func isIPOnInterface(ifaceName, targetIP string) bool {
-	iface, err := net.InterfaceByName(ifaceName)
-	if err != nil {
-		return false
-	}
-	addrs, err := iface.Addrs()
-	if err != nil {
-		return false
-	}
-	for _, addr := range addrs {
-		// addr is in CIDR format like "127.1.2.3/32"
-		ip, _, _ := net.ParseCIDR(addr.String())
-		if ip != nil && ip.String() == targetIP {
-			return true
-		}
-	}
-	return false
 }

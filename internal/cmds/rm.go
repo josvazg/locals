@@ -41,5 +41,5 @@ func rm(p *locals.Platform, localsDir, domain string) error {
 	if dryrun {
 		return show(rmScript, domain)
 	}
-	return run(p, rmScript, domain)
+	return runScript(p, rmScript, domain)
 }

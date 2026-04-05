@@ -25,7 +25,8 @@ const (
 var domainSuffix = fmt.Sprintf(".%s.", domain)
 
 func dnsCmd(ctx context.Context, p *locals.Platform) *cobra.Command {
-	return &cobra.Command{
+	var logFile string
+	cmd := &cobra.Command{
 		Use:   "dns address [fallbacks]",
 		Short: "Run the locals DNS service",
 		Long: "Runs a simple local DNS service, including other servers as fallback.\n" +
@@ -33,15 +34,22 @@ func dnsCmd(ctx context.Context, p *locals.Platform) *cobra.Command {
 			"$ dns 127.1.2.3 1.1.1.1,4.4.4.4,8.8.8.8,9.9.9.9",
 		Args: cobra.RangeArgs(1, 2),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if logFile != "" {
+				if err := setupLog(logFile); err != nil {
+					return fmt.Errorf("failed to setup log file: %w", err)
+				}
+			}
 			listen := args[0]
 			fallbacks, err := fallbacks(p, args, listen)
 			if err != nil {
 				return err
 			}
-            cmd.SilenceUsage = true
+			cmd.SilenceUsage = true
 			return runDNS(ctx, listen, fallbacks)
 		},
 	}
+	cmd.Flags().StringVarP(&logFile, "log", "", "", "file to log to")
+	return cmd
 }
 
 func runDNS(ctx context.Context, listenAddr string, fallbacks []string) error {

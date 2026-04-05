@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -12,12 +13,6 @@ import (
 	"locals/internal/render"
 
 	"github.com/spf13/cobra"
-)
-
-const (
-	probeRetries = 5
-
-	probePause = 1 * time.Second
 )
 
 func onCmd(p *locals.Platform, localsDir string) *cobra.Command {
@@ -48,7 +43,7 @@ func on(p *locals.Platform, localsDir string, dryrun bool) error {
 	if dryrun {
 		return show(onScript)
 	}
-	if err := run(p, onScript); err != nil {
+	if err := runScript(p, onScript); err != nil {
 		return fmt.Errorf("failed to run on.sh script: %w", err)
 	}
 	return probeServices(state.DNSListen, ":443")
@@ -76,7 +71,7 @@ func probeDNS(dnsListen string) error {
 	d := net.Dialer{Timeout: 2 * time.Second}
 	conn, err := d.Dial("udp", completeAddress(dnsListen, 53))
 	if err != nil {
-		return fmt.Errorf("probe failed, check failure at /tmp/locals-dns.log: %w", err)
+		return fmt.Errorf("probe failed, check failure at %s/locals-dns.log: %w", os.TempDir(), err)
 	}
 	defer conn.Close()
 	return nil
@@ -85,7 +80,7 @@ func probeDNS(dnsListen string) error {
 func probeWeb(webListen string) error {
 	conn, err := net.DialTimeout("tcp", completeAddress(webListen, 443), 2*time.Second)
 	if err != nil {
-		return fmt.Errorf("probe failed, check failure at /tmp/locals-web.log: %w", err)
+		return fmt.Errorf("probe failed, check failure at %s/locals-web.log: %w", os.TempDir(), err)
 	}
 	defer conn.Close()
 	return nil

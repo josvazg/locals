@@ -17,17 +17,19 @@
           name = "locals";
 
           buildInputs = with pkgs; [
-            curl
-            git
             mage
             shellcheck
-            neovim
-            mkcert
+            git
+            curl
             unstable.go
-          ];
+	    mkcert
+	    neovim
+	  ];
 
           shellHook = ''
-            export PATH=$PATH:$(go env GOPATH)/bin
+            export PATH=bin:$(go env GOPATH)/bin:$PATH
+            export GOTOOLCHAIN=auto
+            export GOSUMDB=sum.golang.org
             export EDITOR=nvim
             export CGO_CFLAGS="-O2"
           '';

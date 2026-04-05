@@ -24,9 +24,9 @@ function launch_dns() {
         rm "$DNS_PID_FILE"
     fi
     # note fallbacks are extracted by the not yet replace /etc/resolv.conf
-    sudo nohup "${LOCALS}" dns "$DNS_LISTEN" > /tmp/locals-dns.log 2>&1 &
+    sudo nohup "${LOCALS}" dns "$DNS_LISTEN" 2>&1 | sudo tee /tmp/locals-dns.log > /dev/null &
     echo $! > "$DNS_PID_FILE"
-    echo "✅ locals DNS started on $DNS_LISTEN (PID: $(cat $DNS_PID_FILE))"
+    echo "✅ locals DNS started on $DNS_LISTEN (PID: $(cat "${DNS_PID_FILE}"))"
 }
 
 function apply_dns_config_resolved() {
@@ -73,7 +73,6 @@ apply_dns_config
 # --- stop locals web proxy ---
 WEB_PID_FILE="${LOCALS_DIR}/web.pid"
 RULES_DIR="${LOCALS_DIR}/web"
-BINARY_PATH="$(type -p locals)"
 
 function launch_web() {
     mkdir -p "$RULES_DIR"
@@ -84,7 +83,7 @@ function launch_web() {
             return
         fi
     fi
-    sudo nohup "${LOCALS}" web "${RULES_DIR}" > /tmp/locals-web.log 2>&1 &
+    sudo nohup "${LOCALS}" web "${RULES_DIR}" 2>&1 | sudo tee /tmp/locals-web.log > /dev/null &
     echo $! > "$WEB_PID_FILE"
     echo "✅ Web proxy active on :443 (PID: $(cat $WEB_PID_FILE))"
 }
