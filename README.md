@@ -86,3 +86,4 @@ Stops the services and unmounts the bind mount on Linux or removes the resolver 
 - Fedora
 - Arch
 
+GitHub CI only tests **Ubuntu**, MacOS is failing on the CI, but can be tested locally in any Mac system. For other distros, an [incus](https://linuxcontainers.org/incus/introduction/) setup is required on a Linux box, and is triggered with `mage -v testLinuxDistro`.
