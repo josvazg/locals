@@ -197,7 +197,8 @@ func testCmd(ctx context.Context, t *testing.T, want string, args ...string) {
 	t.Helper()
 
 	got, err := runLocals(ctx, args...)
-	require.NoError(t, err)
+	require.NoError(t, err, "failed to test command: %v\n got %v",
+		strings.Join(args, " "), string(got))
 	assert.Regexp(t, regexp.MustCompile(string(want)), string(got))
 }
 
