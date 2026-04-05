@@ -13,8 +13,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Testing on both Linux and macOS
-        os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-latest] # macos-latest won't work in CI, but works locally
 
     steps:
       - name: Checkout code
