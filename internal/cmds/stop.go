@@ -107,7 +107,7 @@ func stopService(service string, state *render.State, dryrun bool) error {
 	pidFile := filepath.Join(state.LocalsDir, fmt.Sprintf("%s.pid", service))
 	if pid := readPIDFromFile(pidFile); pid >= 0 {
 		if processExistsForPID(pid) {
-			run(dryrun, "kill", strconv.Itoa(pid))
+			run(dryrun, "sudo", "kill", strconv.Itoa(pid))
 			log.Printf("🛑 Terminated locals %s (PID: %d)", service, pid)
 		} else {
 			log.Printf("⚠️ PID file exists but process %d is already dead.", pid)

@@ -47,7 +47,7 @@ func Test() error {
 	env := map[string]string{
 		"LOCALSBIN": filepath.Join(cwd, "bin", "locals"),
 	}
-	err = runVEnv(env, "go", "test", "-v", "./...")
+	err = runVEnv(env, "go", "test", "-v", "-timeout", "2m", "./...")
 	if err == nil {
 		fmt.Println("✅ Tests PASSED")
 	}

@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"syscall"
 
 	"locals/api/locals"
 )
@@ -82,8 +83,22 @@ func launch(dryrun bool, cmd string, args ...string) (int, error) {
 		return -1, nil
 	}
 	command := exec.Command(cmd, args...)
+	// FIX: Disconnect the background process from the test's pipes.
+	// This prevents the parent 'CombinedOutput' from hanging.
+	command.Stdout = nil
+	command.Stderr = nil
+	command.Stdin = nil
+	command.SysProcAttr = &syscall.SysProcAttr{
+		Setpgid: true,
+		Pgid:    0,
+	}
 	if err := command.Start(); err != nil {
 		return -1, fmt.Errorf("failed to launch %q: %w", cli, err)
 	}
-	return command.Process.Pid, nil
+
+	// Release allows the Go test to "forget" the process
+	pid := command.Process.Pid
+	command.Process.Release()
+
+	return pid, nil
 }
