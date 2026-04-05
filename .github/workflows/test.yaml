@@ -24,4 +24,4 @@ jobs:
         uses: nixbuild/nix-quick-install-action@v30
 
       - name: Run Mage Tests
-        run: nix --extra-experimental-features "nix-command flakes" run .#test -- -v test
+        run: nix --extra-experimental-features 'nix-command flakes' develop path:. -c mage -v test
