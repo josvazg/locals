@@ -41,6 +41,13 @@ func TestLocals(t *testing.T) {
 	testInactive(ctx, t)
 	testStart(ctx, t)
 	testActive(ctx, t)
+	for _, filename := range []string{"locals-dns.log", "locals-web.log"} {
+		out, err := os.ReadFile(filepath.Join(os.TempDir(), filename))
+		if err != nil {
+			fmt.Printf("failed to read %q: %v", filename, err)
+		}
+		fmt.Printf("%s:\n%v", filename, string(out))
+	}
 	testAdds(ctx, t, servers)
 	testServers(ctx, t, servers)
 	testRemovals(ctx, t, servers)
