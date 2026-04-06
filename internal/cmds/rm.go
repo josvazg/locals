@@ -13,9 +13,9 @@ func rmCmd(localsDir string) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "rm service",
 		Short: "Remove HTTPs access to an endpoint",
-		Long: "Remove a service redirect\n" +
-			"Eg. remove https://whoami.locals:\n" +
-			"$ rm whoami.service localhost:8009",
+		Long: "Remove routing and certificate files for a .locals hostname.\n" +
+			"Example — stop serving whoami.locals:\n\n" +
+			"  locals rm whoami.locals",
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true

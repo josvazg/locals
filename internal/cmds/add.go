@@ -22,9 +22,9 @@ func addCmd(localsDir string) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "add service endpoint",
 		Short: "Add access to an HTTPs endpoint",
-		Long: "Add an HTTPs service URL redirect to a custom endpoint\n" +
-			"Eg. add https://whoami.locals:\n" +
-			"$ add https://whoami.locals localhost:8080",
+		Long: "Add an HTTPS redirect from a .locals hostname to a backend (host:port or URL with scheme).\n" +
+			"Example — serve whoami.locals via localhost:8080:\n\n" +
+			"  locals add whoami.locals localhost:8080",
 		Args: cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true

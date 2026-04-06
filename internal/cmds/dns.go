@@ -29,9 +29,9 @@ func dnsCmd(ctx context.Context, p *locals.Platform) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "dns address [fallbacks]",
 		Short: "Run the locals DNS service",
-		Long: "Runs a simple local DNS service, including other servers as fallback.\n" +
-			"E.g:\n" +
-			"$ dns 127.1.2.3 1.1.1.1,4.4.4.4,8.8.8.8,9.9.9.9",
+		Long: "Runs a simple local DNS service, including other servers as fallback\n" +
+			"Example:\n\n" +
+			"  locals dns 127.1.2.3 1.1.1.1,4.4.4.4,8.8.8.8,9.9.9.9",
 		Args: cobra.RangeArgs(1, 2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if logFile != "" {
