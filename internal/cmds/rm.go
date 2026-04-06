@@ -2,44 +2,43 @@ package cmds
 
 import (
 	"fmt"
+	"log"
 	"path/filepath"
-
-	"locals/api/locals"
-	"locals/internal/render"
 
 	"github.com/spf13/cobra"
 )
 
-func rmCmd(p *locals.Platform, localsDir string) *cobra.Command {
-	return &cobra.Command{
-		Use:   "rm service",
-		Short: "Remove HTTPs access to an endpoint",
-		Long: "Remove HTTPs access to an endpoint by service URL. Eg:\n" +
-			"$ rm whoami.service localhost:8009",
+func rmCmd(localsDir string) *cobra.Command {
+	var dryrun bool
+	cmd := &cobra.Command{
+		Use:   "unserve service",
+		Short: "Unserve HTTPs from an endpoint",
+		Long: "Unserve HTTPs from an endpoint by service URL. Eg:\n" +
+			"$ unserve whoami.service localhost:8009",
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 			domain := args[0]
-			return rm(p, localsDir, domain)
+			if dryrun {
+				log.Printf("DRYRUN")
+			}
+			return rm(dryrun, domain, localsDir)
 		},
 	}
+	cmd.Flags().BoolVarP(&dryrun, "dryrun", "", false, "show what start would have done")
+	return cmd
 }
 
-func rm(p *locals.Platform, localsDir, domain string) error {
-	rs := render.State{
-		LocalsDir: localsDir,
-		SystemCA:  p.Env.SystemCA(),
+func rm(dryrun bool, domain, localsDir string) error {
+	domainCfgFile := filepath.Join(localsDir, "web", fmt.Sprintf("%s.json", domain))
+	if err := safeSudoRemoves(dryrun, domainCfgFile); err != nil {
+		return fmt.Errorf("failed to remove domain %s config file: %w", domain, err)
 	}
-	rmCode, err := render.Remove(rs)
-	if err != nil {
-		return fmt.Errorf("failed to render the rm script: %w", err)
+	certFile := filepath.Join(localsDir, "certs", fmt.Sprintf("%s.pem", domain))
+	keyFile := filepath.Join(localsDir, "certs", fmt.Sprintf("%s-key.pem", domain))
+	if err := safeSudoRemoves(dryrun, certFile, keyFile); err != nil {
+		return fmt.Errorf("failed to remove domain %s keys and certificates: %w", domain, err)
 	}
-	rmScript := &script{name: filepath.Join(localsDir, "rm.sh"), contents: rmCode}
-	if err := save(p, rmScript); err != nil {
-		return fmt.Errorf("failed to save the rm script: %w", err)
-	}
-	if dryrun {
-		return show(rmScript, domain)
-	}
-	return runScript(p, rmScript, domain)
+	log.Printf("⏹️ Removed access to %s", domain)
+	return nil
 }

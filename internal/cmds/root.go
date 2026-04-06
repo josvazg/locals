@@ -69,31 +69,15 @@ func Run(ctx context.Context, p *locals.Platform, args []string) error {
 	rootCmd.SetErr(p.Stderr)
 	rootCmd.SetArgs(args)
 
-	on := onCmd(p, cfgDir)
-	off := offCmd(p, cfgDir)
-	add := addCmd(p, cfgDir)
-	rm := rmCmd(p, cfgDir)
-	start := startCmd(p, cfgDir)
-	stop := stopCmd(p, cfgDir)
-	serve := serveCmd(cfgDir)
-	unserve := unserveCmd(cfgDir)
-	for _, c := range []*cobra.Command{on, off, add, rm} {
-		c.Flags().BoolVarP(&dryrun, "dryrun", "", false,
-			"show locals script but do not run them")
-	}
 	rootCmd.AddCommand(
-		on,
-		off,
-		add,
-		rm,
+		onCmd(p, cfgDir),
+		offCmd(p, cfgDir),
+		addCmd(cfgDir),
+		rmCmd(cfgDir),
 		dnsCmd(ctx, p),
 		webCmd(ctx, p, cfgDir),
 		statusCmd(p, cfgDir),
 		envCmd(),
-		start,
-		stop,
-		serve,
-		unserve,
 	)
 	return rootCmd.Execute()
 }

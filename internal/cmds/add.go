@@ -2,45 +2,56 @@ package cmds
 
 import (
 	"fmt"
+	"log"
 	"path/filepath"
-
-	"locals/api/locals"
-	"locals/internal/render"
 
 	"github.com/spf13/cobra"
 )
 
-func addCmd(p *locals.Platform, localsDir string) *cobra.Command {
-	return &cobra.Command{
-		Use:   "add service endpoint",
-		Short: "Add access to an HTTPs endpoint",
-		Long: "Add a service url such as locals, such as:\n" +
-			"$ add https://whoami.locals localhost:8080",
+const (
+	domainConfig = `{
+  "url": "%s",
+  "endpoint": "%s",
+  "cert": "%s",
+  "key": "%s"
+}`
+)
+
+func addCmd(localsDir string) *cobra.Command {
+	var dryrun bool
+	cmd := &cobra.Command{
+		Use:   "serve url endpoint",
+		Short: "Serve adds access to an HTTPs endpoint",
+		Long: "To serve a url such as whoami.locals:\n" +
+			"$ serve https://whoami.locals localhost:8080",
 		Args: cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 			domain := args[0]
 			targetURL := args[1]
-			return add(p, localsDir, domain, targetURL)
+			if dryrun {
+				log.Printf("DRYRUN")
+			}
+			return add(localsDir, domain, targetURL, dryrun)
 		},
 	}
+	cmd.Flags().BoolVarP(&dryrun, "dryrun", "", false, "show what start would have done")
+	return cmd
 }
 
-func add(p *locals.Platform, localsDir, domain, targetURL string) error {
-	rs := render.State{
-		LocalsDir: localsDir,
-		SystemCA:  p.Env.SystemCA(),
+func add(localsDir, domain, targetURL string, dryrun bool) error {
+	certFile := filepath.Join(localsDir, "certs", fmt.Sprintf("%s.pem", domain))
+	keyFile := filepath.Join(localsDir, "certs", fmt.Sprintf("%s-key.pem", domain))
+	if err := run(dryrun, "mkcert",
+		"-cert-file", certFile, "-key-file", keyFile,
+		domain, "*.locals", "localhost", "127.0.0.1"); err != nil {
+		return fmt.Errorf("failed to setup certificates for domain %s: %w", domain, err)
 	}
-	addCode, err := render.Add(rs)
-	if err != nil {
-		return fmt.Errorf("failed to render the add script: %w", err)
+	domainCfgFile := filepath.Join(localsDir, "web", fmt.Sprintf("%s.json", domain))
+	domainCfgJSON := fmt.Sprintf(domainConfig, domain, targetURL, certFile, keyFile)
+	if err := heredoc(dryrun, domainCfgJSON, domainCfgFile); err != nil {
+		return fmt.Errorf("failed to setup web redirection for domain %s: %w", domain, err)
 	}
-	addScript := &script{name: filepath.Join(localsDir, "add.sh"), contents: addCode}
-	if err := save(p, addScript); err != nil {
-		return fmt.Errorf("failed to save the add script: %w", err)
-	}
-	if dryrun {
-		return show(addScript, domain, targetURL)
-	}
-	return runScript(p, addScript, domain, targetURL)
+	log.Printf("▶️ Added access to %s -> %s", domain, targetURL)
+	return nil
 }
