@@ -78,7 +78,7 @@ func unconfigureDNS(cfg *Config, dryrun bool) error {
 func unconfigureLinuxDNS(dryrun bool) error {
 	if test("mountpoint", "-q", "/etc/resolv.conf") {
 		if err := run(dryrun, "sudo", "umount", "/etc/resolv.conf"); err != nil {
-			return fmt.Errorf("failed to undo mount bind on /etc/resolve.conf: %w", err)
+			return fmt.Errorf("failed to undo mount bind on /etc/resolv.conf: %w", err)
 		}
 	} else {
 		log.Printf("ℹ️ /etc/resolv.conf was not mounted.")
