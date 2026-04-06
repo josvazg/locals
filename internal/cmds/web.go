@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"locals/api/locals"
+	"locals/internal/platform"
 	"log"
 	"net/http"
 	"net/http/httputil"
@@ -97,7 +97,7 @@ func (s *proxyStore) DeleteEndpoint(host string) {
 	delete(s.certs, host)
 }
 
-func webCmd(ctx context.Context, p *locals.Platform, cfgDir string) *cobra.Command {
+func webCmd(ctx context.Context, p *platform.Platform, cfgDir string) *cobra.Command {
 	var logFile string
 	cmd := &cobra.Command{
 		Use:   "web [configDir]",
@@ -121,7 +121,7 @@ func webCmd(ctx context.Context, p *locals.Platform, cfgDir string) *cobra.Comma
 	return cmd
 }
 
-func runWeb(ctx context.Context, p *locals.Platform, webDir string) error {
+func runWeb(ctx context.Context, p *platform.Platform, webDir string) error {
 	store := &proxyStore{
 		routes: make(map[string]*url.URL),
 		certs:  make(map[string]*tls.Certificate),
@@ -174,7 +174,7 @@ func ensureAbsolutePath(dir, cfgDir string) string {
 	return filepath.Join(cfgDir, filepath.Clean(dir))
 }
 
-func loadConfig(p *locals.Platform, store ProxyStore, webDir string) error {
+func loadConfig(p *platform.Platform, store ProxyStore, webDir string) error {
 	log.Printf("loading web configs from %s", webDir)
 	files, err := filepath.Glob(filepath.Join(webDir, "*.json"))
 	if err != nil {
@@ -256,7 +256,7 @@ func getCertificate(store ProxyStore) func(*tls.ClientHelloInfo) (*tls.Certifica
 	}
 }
 
-func detectChangesLoop(ctx context.Context, p *locals.Platform, store ProxyStore, webDir string, watcher *fsnotify.Watcher) {
+func detectChangesLoop(ctx context.Context, p *platform.Platform, store ProxyStore, webDir string, watcher *fsnotify.Watcher) {
 	for {
 		select {
 		case event, ok := <-watcher.Events:

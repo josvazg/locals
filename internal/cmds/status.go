@@ -6,12 +6,12 @@ import (
 	"path/filepath"
 	"strings"
 
-	"locals/api/locals"
+	"locals/internal/platform"
 
 	"github.com/spf13/cobra"
 )
 
-func statusCmd(p *locals.Platform, localsDir string) *cobra.Command {
+func statusCmd(p *platform.Platform, localsDir string) *cobra.Command {
 	return &cobra.Command{
 		Use:   "status",
 		Short: "Show locals status",
@@ -23,7 +23,7 @@ func statusCmd(p *locals.Platform, localsDir string) *cobra.Command {
 	}
 }
 
-func status(p *locals.Platform, configDir string) error {
+func status(p *platform.Platform, configDir string) error {
 	fmt.Println("----------- 📍 Locals Status -----------")
 
 	dnsStatus := p.CheckDNSSetup()
@@ -70,7 +70,7 @@ func status(p *locals.Platform, configDir string) error {
 	return nil
 }
 
-func isProcessAlive(p *locals.Platform, pidPath string) bool {
+func isProcessAlive(p *platform.Platform, pidPath string) bool {
 	data, err := p.IO.ReadFile(pidPath)
 	if err != nil {
 		return false

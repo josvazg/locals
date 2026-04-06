@@ -2,7 +2,6 @@ package cmds
 
 import (
 	"fmt"
-	"locals/api/locals"
 	"locals/internal/platform"
 	"log"
 	"path/filepath"
@@ -13,7 +12,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func offCmd(p *locals.Platform, localsDir string) *cobra.Command {
+func offCmd(p *platform.Platform, localsDir string) *cobra.Command {
 	var dryrun bool
 	var wipe bool
 	cmd := &cobra.Command{
@@ -32,9 +31,9 @@ func offCmd(p *locals.Platform, localsDir string) *cobra.Command {
 	return cmd
 }
 
-func off(p *locals.Platform, localsDir string, dryrun, wipe bool) error {
+func off(p *platform.Platform, localsDir string, dryrun, wipe bool) error {
 	cfg := Config{
-		DNSListen: locals.DefaultDNSListen,
+		DNSListen: platform.DefaultDNSListen,
 		LocalsDir: localsDir,
 		SystemCA:  p.Env.SystemCA(),
 	}

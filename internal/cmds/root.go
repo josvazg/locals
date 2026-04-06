@@ -5,14 +5,14 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"locals/api/locals"
+	"locals/internal/platform"
 
 	"github.com/spf13/cobra"
 )
 
 var dryrun bool
 
-func Run(ctx context.Context, p *locals.Platform, args []string) error {
+func Run(ctx context.Context, p *platform.Platform, args []string) error {
 	cfgDir, err := localsDir(p)
 	if err != nil {
 		return fmt.Errorf("failed to compute config dir location: %w", err)
@@ -45,21 +45,21 @@ func Run(ctx context.Context, p *locals.Platform, args []string) error {
 	return rootCmd.Execute()
 }
 
-func localsDir(p *locals.Platform) (string, error) {
-	localsDir := p.Env(locals.ENV_VAR_LOCALS_CONFIG_DIR)
+func localsDir(p *platform.Platform) (string, error) {
+	localsDir := p.Env(platform.EnvLocalsConfigDir)
 	if localsDir != "" {
 		return localsDir, nil
 	}
 	homeDir, err := p.HomeDir()
-	if err != nil && p.Env(locals.ENV_VAR_LOCALS_CONFIG_DIR) == "" {
+	if err != nil && p.Env(platform.EnvLocalsConfigDir) == "" {
 		return "", fmt.Errorf("locals failed : %w", err)
 	}
-	return filepath.Join(homeDir, locals.DirName), nil
+	return filepath.Join(homeDir, platform.DirName), nil
 }
 
 // initFileSystem creates ~/.config/locals directories
-func initFileSystem(p *locals.Platform, cfgDir string) error {
-	dirs := []string{locals.WebDir, locals.CertsDir}
+func initFileSystem(p *platform.Platform, cfgDir string) error {
+	dirs := []string{platform.WebDir, platform.CertsDir}
 
 	for _, d := range dirs {
 		path := filepath.Join(cfgDir, d)

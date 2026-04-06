@@ -3,7 +3,6 @@ package cmds
 import (
 	"errors"
 	"fmt"
-	"locals/api/locals"
 	"locals/internal/platform"
 	"log"
 	"net"
@@ -37,7 +36,7 @@ type Config struct {
 	LocalsBin string
 }
 
-func onCmd(p *locals.Platform, localsDir string) *cobra.Command {
+func onCmd(p *platform.Platform, localsDir string) *cobra.Command {
 	var dryrun bool
 	cmd := &cobra.Command{
 		Use:   "on",
@@ -54,13 +53,13 @@ func onCmd(p *locals.Platform, localsDir string) *cobra.Command {
 	return cmd
 }
 
-func on(p *locals.Platform, localsDir string, dryrun bool) error {
+func on(p *platform.Platform, localsDir string, dryrun bool) error {
 	localsBin, err := localsBinary()
 	if err != nil {
 		return fmt.Errorf("failed to resolve path to locals: %w", err)
 	}
 	state := Config{
-		DNSListen: locals.DefaultDNSListen,
+		DNSListen: platform.DefaultDNSListen,
 		LocalsDir: localsDir,
 		LocalsBin: localsBin,
 		SystemCA:  p.Env.SystemCA(),
