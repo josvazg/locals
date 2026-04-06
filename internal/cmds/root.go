@@ -12,43 +12,6 @@ import (
 
 var dryrun bool
 
-// --- DATA STRUCTURES (Traefik YAML) ---
-type TraefikConfig struct {
-	HTTP HTTPConfig `yaml:"http"`
-}
-
-type HTTPConfig struct {
-	Routers  map[string]Router  `yaml:"routers"`
-	Services map[string]Service `yaml:"services"`
-}
-
-type Router struct {
-	Rule    string     `yaml:"rule"`
-	Service string     `yaml:"service"`
-	TLS     *TLSConfig `yaml:"tls,omitempty"`
-}
-
-type TLSConfig struct {
-	Domains []Domain `yaml:"domains"`
-}
-
-type Domain struct {
-	Main string   `yaml:"main"`
-	SANs []string `yaml:"sans,omitempty"`
-}
-
-type Service struct {
-	LoadBalancer LoadBalancer `yaml:"loadBalancer"`
-}
-
-type LoadBalancer struct {
-	Servers []Server `yaml:"servers"`
-}
-
-type Server struct {
-	URL string `yaml:"url"`
-}
-
 func Run(ctx context.Context, p *locals.Platform, args []string) error {
 	cfgDir, err := localsDir(p)
 	if err != nil {
