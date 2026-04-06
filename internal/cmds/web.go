@@ -23,7 +23,8 @@ import (
 const (
 	DefaultConfigDir = "web"
 
-	ListenAddr = ":443"
+	// Localhost only (not 0.0.0.0). Prefer this hostname over :443 so we bind loopback, not all interfaces.
+	ListenAddr = "localhost:443"
 )
 
 var (

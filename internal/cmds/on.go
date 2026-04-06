@@ -84,7 +84,7 @@ func on(p *locals.Platform, localsDir string, dryrun bool) error {
 	if dryrun {
 		return nil
 	}
-	return probeServices(state.DNSListen, ":443")
+	return probeServices(state.DNSListen, ListenAddr)
 }
 
 func localsBinary() (string, error) {
