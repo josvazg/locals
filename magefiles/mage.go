@@ -30,14 +30,13 @@ func Build() error {
 // Shellcheck runs the shell check
 func Shellcheck() error {
 	return sh.RunV("shellcheck", expandFiles([]string{
-		"./internal/render/testdata/darwin/*.sh",
-		"./internal/render/testdata/linux/*.sh",
+		"./test/*.sh",
 	})...)
 }
 
 // Test runs all unit tests in the project.
 func Test() error {
-	mg.Deps(Build)
+	mg.Deps(Build, Shellcheck)
 
 	fmt.Println("Running tests...")
 	cwd, err := os.Getwd()

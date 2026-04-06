@@ -19,7 +19,7 @@ sleep 5
 
 # 3. Mount your current directory directly (No more file push!)
 # This maps your local folder to /src inside the container
-incus config device add "$NODE_NAME" project-src disk source=$(pwd) path=/src
+incus config device add "$NODE_NAME" project-src disk source="$(pwd)" path=/src
 
 # 4. Install dependencies and run tests
 SAFE_ARGS=$(printf "%q " "$@")

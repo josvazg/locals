@@ -8,17 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"syscall"
-
-	"locals/api/locals"
 )
-
-func runScript(p *locals.Platform, script *script, args ...string) error {
-	scriptName := filepath.Base(script.name)
-	if err := p.Execute(script.name, args...); err != nil {
-		return fmt.Errorf("failed to run %s script: %w", scriptName, err)
-	}
-	return nil
-}
 
 func run(dryrun bool, cmd string, args ...string) error {
 	cli := strings.Join(append([]string{cmd}, args...), " ")
