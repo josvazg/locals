@@ -20,10 +20,11 @@ const (
 func addCmd(localsDir string) *cobra.Command {
 	var dryrun bool
 	cmd := &cobra.Command{
-		Use:   "serve url endpoint",
-		Short: "Serve adds access to an HTTPs endpoint",
-		Long: "To serve a url such as whoami.locals:\n" +
-			"$ serve https://whoami.locals localhost:8080",
+		Use:   "add service endpoint",
+		Short: "Add access to an HTTPs endpoint",
+		Long: "Add an HTTPs service URL redirect to a custom endpoint\n" +
+			"Eg. add https://whoami.locals:\n" +
+			"$ add https://whoami.locals localhost:8080",
 		Args: cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true

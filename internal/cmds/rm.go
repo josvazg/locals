@@ -11,10 +11,11 @@ import (
 func rmCmd(localsDir string) *cobra.Command {
 	var dryrun bool
 	cmd := &cobra.Command{
-		Use:   "unserve service",
-		Short: "Unserve HTTPs from an endpoint",
-		Long: "Unserve HTTPs from an endpoint by service URL. Eg:\n" +
-			"$ unserve whoami.service localhost:8009",
+		Use:   "rm service",
+		Short: "Remove HTTPs access to an endpoint",
+		Long: "Remove a service redirect\n" +
+			"Eg. remove https://whoami.locals:\n" +
+			"$ rm whoami.service localhost:8009",
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true

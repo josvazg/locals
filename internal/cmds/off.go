@@ -17,8 +17,8 @@ func offCmd(p *locals.Platform, localsDir string) *cobra.Command {
 	var dryrun bool
 	var wipe bool
 	cmd := &cobra.Command{
-		Use:   "stop",
-		Short: "Stop the web proxy and restore DNS",
+		Use:   "off",
+		Short: "Deactivate locals' web proxy and restore default DNS config",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 			if dryrun {
