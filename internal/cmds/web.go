@@ -23,8 +23,8 @@ import (
 const (
 	DefaultConfigDir = "web"
 
-	// Localhost only (not 0.0.0.0). Prefer this hostname over :443 so we bind loopback, not all interfaces.
-	ListenAddr = "localhost:443"
+	// Localhost only (IPv4 loopback; matches *.locals A records). Using 127.0.0.1 avoids :443 binding all interfaces.
+	ListenAddr = "127.0.0.1:443"
 )
 
 var (
@@ -128,7 +128,7 @@ func runWeb(ctx context.Context, p *locals.Platform, webDir string) error {
 	}
 
 	if err := loadConfig(p, store, webDir); err != nil {
-		return fmt.Errorf("failed to load config: %s", err)
+		return fmt.Errorf("failed to load config: %w", err)
 	}
 
 	server := &http.Server{
@@ -139,9 +139,14 @@ func runWeb(ctx context.Context, p *locals.Platform, webDir string) error {
 		},
 	}
 
-	watcher, _ := fsnotify.NewWatcher()
+	watcher, err := fsnotify.NewWatcher()
+	if err != nil {
+		return fmt.Errorf("failed to create config watcher: %w", err)
+	}
 	defer watcher.Close()
-	watcher.Add(webDir)
+	if err := watcher.Add(webDir); err != nil {
+		return fmt.Errorf("failed to watch web config dir %q: %w", webDir, err)
+	}
 	go detectChangesLoop(ctx, p, store, webDir, watcher)
 
 	log.Printf("🚀 Web Proxy listening on %s", ListenAddr)
@@ -177,17 +182,23 @@ func loadConfig(p *locals.Platform, store ProxyStore, webDir string) error {
 	}
 	hosts := map[string]struct{}{}
 	for _, f := range files {
-		data, _ := p.IO.ReadFile(f)
+		data, err := p.IO.ReadFile(f)
+		if err != nil {
+			return fmt.Errorf("read web config %s: %w", f, err)
+		}
 		var cfg WebConfig
 		if err := json.Unmarshal(data, &cfg); err != nil {
-			return fmt.Errorf("failed to load web config: %w", err)
+			return fmt.Errorf("decode web config %s: %w", f, err)
 		}
 
-		target, _ := url.Parse(ensureProtocol(cfg.Endpoint))
+		target, err := url.Parse(ensureProtocol(cfg.Endpoint))
+		if err != nil {
+			return fmt.Errorf("parse endpoint for %s (%s): %w", cfg.URL, f, err)
+		}
 
 		cert, err := tls.LoadX509KeyPair(cfg.CertFile, cfg.KeyFile)
 		if err != nil {
-			return fmt.Errorf("⚠️  Failed to load cert for %s: %v", cfg.URL, err)
+			return fmt.Errorf("load cert for %s (%s): %w", cfg.URL, f, err)
 		}
 
 		store.AddEndpoint(cfg.URL, target, &cert)
