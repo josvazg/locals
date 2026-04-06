@@ -100,7 +100,7 @@ func testInactive(ctx context.Context, t *testing.T) {
 
 func testStart(ctx context.Context, t *testing.T) {
 	t.Helper()
-	testCmd(ctx, t, loadFile(t, "on.out"), "start")
+	testCmd(ctx, t, loadFile(t, "on.out"), "on")
 }
 
 func testActive(ctx context.Context, t *testing.T) {
@@ -116,7 +116,7 @@ func testAdds(ctx context.Context, t *testing.T, servers []*httptest.Server) {
 		endpoint := server.Listener.Addr().String()
 		url := serviceURL(portFrom(endpoint))
 		serviceList = fmt.Sprintf("%s  🔗 %s -> %s\n", serviceList, url, endpoint)
-		testCmd(ctx, t, addContent, "serve", url, endpoint)
+		testCmd(ctx, t, addContent, "add", url, endpoint)
 	}
 	added := loadFile(t, "active.out")
 	patchedAdded := strings.Replace(added, `  \(none\)`, serviceList[:len(serviceList)-1], 1)
@@ -169,7 +169,7 @@ func testRemovals(ctx context.Context, t *testing.T, servers []*httptest.Server)
 	for _, server := range sortByPort(servers) {
 		endpoint := server.Listener.Addr().String()
 		url := fmt.Sprintf("service-%s.locals", portFrom(endpoint))
-		testCmd(ctx, t, addContent, "unserve", url)
+		testCmd(ctx, t, addContent, "rm", url)
 	}
 }
 
@@ -191,7 +191,7 @@ func sortByPort(servers []*httptest.Server) []*httptest.Server {
 
 func testOff(ctx context.Context, t *testing.T) {
 	t.Helper()
-	testCmd(ctx, t, loadFile(t, "off.out"), "stop")
+	testCmd(ctx, t, loadFile(t, "off.out"), "off")
 }
 
 func loadFile(t *testing.T, filename string) string {

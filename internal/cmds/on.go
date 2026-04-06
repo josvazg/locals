@@ -40,8 +40,8 @@ type Config struct {
 func onCmd(p *locals.Platform, localsDir string) *cobra.Command {
 	var dryrun bool
 	cmd := &cobra.Command{
-		Use:   "start",
-		Short: "Start the web proxy and grab DNS",
+		Use:   "on",
+		Short: "Activate locals by starting the web proxy and grab local DNS",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 			if dryrun {
