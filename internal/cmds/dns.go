@@ -5,7 +5,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"locals/api/locals"
+	"locals/internal/platform"
 	"log"
 	"net"
 	"strings"
@@ -24,14 +24,14 @@ const (
 
 var domainSuffix = fmt.Sprintf(".%s.", domain)
 
-func dnsCmd(ctx context.Context, p *locals.Platform) *cobra.Command {
+func dnsCmd(ctx context.Context, p *platform.Platform) *cobra.Command {
 	var logFile string
 	cmd := &cobra.Command{
 		Use:   "dns address [fallbacks]",
 		Short: "Run the locals DNS service",
-		Long: "Runs a simple local DNS service, including other servers as fallback.\n" +
-			"E.g:\n" +
-			"$ dns 127.1.2.3 1.1.1.1,4.4.4.4,8.8.8.8,9.9.9.9",
+		Long: "Runs a simple local DNS service, including other servers as fallback\n" +
+			"Example:\n\n" +
+			"  locals dns 127.1.2.3 1.1.1.1,4.4.4.4,8.8.8.8,9.9.9.9",
 		Args: cobra.RangeArgs(1, 2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if logFile != "" {
@@ -114,7 +114,7 @@ func ensurePort(addr string) string {
 	return addr
 }
 
-func fallbacks(p *locals.Platform, args []string, listen string) ([]string, error) {
+func fallbacks(p *platform.Platform, args []string, listen string) ([]string, error) {
 	if len(args) > 1 {
 		return strings.Split(args[1], ","), nil
 	}
@@ -125,7 +125,7 @@ func fallbacks(p *locals.Platform, args []string, listen string) ([]string, erro
 	return removeIfFound(allNameservers, listen), nil
 }
 
-func nameservers(p *locals.Platform, path string) ([]string, error) {
+func nameservers(p *platform.Platform, path string) ([]string, error) {
 	contents, err := p.IO.ReadFile(path)
 	if err != nil {
 		return nil, err

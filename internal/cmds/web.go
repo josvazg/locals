@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"locals/api/locals"
+	"locals/internal/platform"
 	"log"
 	"net/http"
 	"net/http/httputil"
@@ -23,7 +23,8 @@ import (
 const (
 	DefaultConfigDir = "web"
 
-	ListenAddr = ":443"
+	// Localhost only (IPv4 loopback; matches *.locals A records). Using 127.0.0.1 avoids :443 binding all interfaces.
+	ListenAddr = "127.0.0.1:443"
 )
 
 var (
@@ -96,7 +97,7 @@ func (s *proxyStore) DeleteEndpoint(host string) {
 	delete(s.certs, host)
 }
 
-func webCmd(ctx context.Context, p *locals.Platform, cfgDir string) *cobra.Command {
+func webCmd(ctx context.Context, p *platform.Platform, cfgDir string) *cobra.Command {
 	var logFile string
 	cmd := &cobra.Command{
 		Use:   "web [configDir]",
@@ -120,14 +121,14 @@ func webCmd(ctx context.Context, p *locals.Platform, cfgDir string) *cobra.Comma
 	return cmd
 }
 
-func runWeb(ctx context.Context, p *locals.Platform, webDir string) error {
+func runWeb(ctx context.Context, p *platform.Platform, webDir string) error {
 	store := &proxyStore{
 		routes: make(map[string]*url.URL),
 		certs:  make(map[string]*tls.Certificate),
 	}
 
 	if err := loadConfig(p, store, webDir); err != nil {
-		return fmt.Errorf("failed to load config: %s", err)
+		return fmt.Errorf("failed to load config: %w", err)
 	}
 
 	server := &http.Server{
@@ -138,9 +139,14 @@ func runWeb(ctx context.Context, p *locals.Platform, webDir string) error {
 		},
 	}
 
-	watcher, _ := fsnotify.NewWatcher()
+	watcher, err := fsnotify.NewWatcher()
+	if err != nil {
+		return fmt.Errorf("failed to create config watcher: %w", err)
+	}
 	defer watcher.Close()
-	watcher.Add(webDir)
+	if err := watcher.Add(webDir); err != nil {
+		return fmt.Errorf("failed to watch web config dir %q: %w", webDir, err)
+	}
 	go detectChangesLoop(ctx, p, store, webDir, watcher)
 
 	log.Printf("🚀 Web Proxy listening on %s", ListenAddr)
@@ -168,7 +174,7 @@ func ensureAbsolutePath(dir, cfgDir string) string {
 	return filepath.Join(cfgDir, filepath.Clean(dir))
 }
 
-func loadConfig(p *locals.Platform, store ProxyStore, webDir string) error {
+func loadConfig(p *platform.Platform, store ProxyStore, webDir string) error {
 	log.Printf("loading web configs from %s", webDir)
 	files, err := filepath.Glob(filepath.Join(webDir, "*.json"))
 	if err != nil {
@@ -176,17 +182,23 @@ func loadConfig(p *locals.Platform, store ProxyStore, webDir string) error {
 	}
 	hosts := map[string]struct{}{}
 	for _, f := range files {
-		data, _ := p.IO.ReadFile(f)
+		data, err := p.IO.ReadFile(f)
+		if err != nil {
+			return fmt.Errorf("read web config %s: %w", f, err)
+		}
 		var cfg WebConfig
 		if err := json.Unmarshal(data, &cfg); err != nil {
-			return fmt.Errorf("failed to load web config: %w", err)
+			return fmt.Errorf("decode web config %s: %w", f, err)
 		}
 
-		target, _ := url.Parse(ensureProtocol(cfg.Endpoint))
+		target, err := url.Parse(ensureProtocol(cfg.Endpoint))
+		if err != nil {
+			return fmt.Errorf("parse endpoint for %s (%s): %w", cfg.URL, f, err)
+		}
 
 		cert, err := tls.LoadX509KeyPair(cfg.CertFile, cfg.KeyFile)
 		if err != nil {
-			return fmt.Errorf("⚠️  Failed to load cert for %s: %v", cfg.URL, err)
+			return fmt.Errorf("load cert for %s (%s): %w", cfg.URL, f, err)
 		}
 
 		store.AddEndpoint(cfg.URL, target, &cert)
@@ -244,7 +256,7 @@ func getCertificate(store ProxyStore) func(*tls.ClientHelloInfo) (*tls.Certifica
 	}
 }
 
-func detectChangesLoop(ctx context.Context, p *locals.Platform, store ProxyStore, webDir string, watcher *fsnotify.Watcher) {
+func detectChangesLoop(ctx context.Context, p *platform.Platform, store ProxyStore, webDir string, watcher *fsnotify.Watcher) {
 	for {
 		select {
 		case event, ok := <-watcher.Events:

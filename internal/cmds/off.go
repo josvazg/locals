@@ -2,7 +2,6 @@ package cmds
 
 import (
 	"fmt"
-	"locals/api/locals"
 	"locals/internal/platform"
 	"log"
 	"path/filepath"
@@ -13,7 +12,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func offCmd(p *locals.Platform, localsDir string) *cobra.Command {
+func offCmd(p *platform.Platform, localsDir string) *cobra.Command {
 	var dryrun bool
 	var wipe bool
 	cmd := &cobra.Command{
@@ -32,9 +31,9 @@ func offCmd(p *locals.Platform, localsDir string) *cobra.Command {
 	return cmd
 }
 
-func off(p *locals.Platform, localsDir string, dryrun, wipe bool) error {
+func off(p *platform.Platform, localsDir string, dryrun, wipe bool) error {
 	cfg := Config{
-		DNSListen: locals.DefaultDNSListen,
+		DNSListen: platform.DefaultDNSListen,
 		LocalsDir: localsDir,
 		SystemCA:  p.Env.SystemCA(),
 	}
@@ -78,7 +77,7 @@ func unconfigureDNS(cfg *Config, dryrun bool) error {
 func unconfigureLinuxDNS(dryrun bool) error {
 	if test("mountpoint", "-q", "/etc/resolv.conf") {
 		if err := run(dryrun, "sudo", "umount", "/etc/resolv.conf"); err != nil {
-			return fmt.Errorf("failed to undo mount bind on /etc/resolve.conf: %w", err)
+			return fmt.Errorf("failed to undo mount bind on /etc/resolv.conf: %w", err)
 		}
 	} else {
 		log.Printf("ℹ️ /etc/resolv.conf was not mounted.")
@@ -104,16 +103,23 @@ func unconfigureMacDNS(state *Config, dryrun bool) error {
 
 func stopService(service string, cfg *Config, dryrun bool) error {
 	pidFile := filepath.Join(cfg.LocalsDir, fmt.Sprintf("%s.pid", service))
-	if pid := readPIDFromFile(pidFile); pid >= 0 {
-		if processExistsForPID(pid) {
-			run(dryrun, "sudo", "kill", strconv.Itoa(pid))
-			log.Printf("🛑 Terminated locals %s (PID: %d)", service, pid)
-		} else {
-			log.Printf("⚠️ PID file exists but process %d is already dead.", pid)
-		}
-		run(dryrun, "rm", pidFile)
-	} else {
+	pid := readPIDFromFile(pidFile)
+	if pid < 0 {
 		log.Printf("ℹ️ No %s PID file found. Nothing to kill.", service)
+		return nil
+	}
+
+	if processExistsForPID(pid) {
+		if err := run(dryrun, "sudo", "kill", strconv.Itoa(pid)); err != nil {
+			return fmt.Errorf("failed to stop locals %s (pid %d): %w", service, pid, err)
+		}
+		log.Printf("🛑 Terminated locals %s (PID: %d)", service, pid)
+	} else {
+		log.Printf("⚠️ PID file exists but process %d is already dead.", pid)
+	}
+
+	if err := run(dryrun, "rm", pidFile); err != nil {
+		return fmt.Errorf("failed to remove %s PID file %q: %w", service, pidFile, err)
 	}
 	return nil
 }

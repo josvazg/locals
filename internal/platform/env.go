@@ -1,4 +1,4 @@
-package env
+package platform
 
 const (
 	EnvSystemCA = "SYSTEM_CA"
@@ -6,6 +6,9 @@ const (
 	DefaultSystemCA = "/etc/ssl/certs/ca-certificates.crt"
 
 	EnvDomain = "DOMAIN"
+
+	// EnvLocalsConfigDir overrides the default ~/.config/locals state directory.
+	EnvLocalsConfigDir = "LOCALS_CONFIG_DIR"
 )
 
 type EnvFunc func(string) string

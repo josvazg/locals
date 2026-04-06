@@ -1,4 +1,4 @@
-package locals
+package platform
 
 import (
 	"errors"
@@ -10,12 +10,9 @@ import (
 	"runtime"
 	"strings"
 	"syscall"
-
-	"locals/internal/env"
-	"locals/internal/platform"
 )
 
-// --- CONFIGURATION ---
+// Configuration paths and defaults for locals state under the user's config dir.
 const (
 	DirName  = ".config/locals"
 	WebDir   = "web"
@@ -24,24 +21,17 @@ const (
 	DefaultDNSListen = "127.1.2.3"
 )
 
-const (
-	ENV_VAR_LOCALS_CONFIG_DIR = "LOCALS_CONFIG_DIR"
-)
-
-// Platform defines everything the tool needs from the Operating System.
-// By swapping these out, we can test the entire app in memory.
+// Platform defines everything the tool needs from the operating system.
+// Swap these out to run the app in tests or with recorded behavior.
 type Platform struct {
 	Stdout io.Writer
 	Stderr io.Writer
 	Stdin  io.Reader
-	// Env is a function that retrieves environment variables
-	Env env.EnvFunc
-	// HomeDir is a function to find the user's home without hardcoding os.UserHomeDir
+	Env    EnvFunc
 	HomeDir func() (string, error)
-	IO      FilesHandler
-	Process ProcessInfo
-	// Execute is a function to run external binaries (mkcert, traefik)
-	Execute       func(name string, args ...string) error
+	IO       FilesHandler
+	Process  ProcessInfo
+	Execute  func(name string, args ...string) error
 	CheckDNSSetup func() *DNSStatus
 }
 
@@ -58,7 +48,7 @@ func (s *DNSStatus) String() string {
 	return fmt.Sprintf("%s %s", icon, s.Status)
 }
 
-// Returns a real OS platform impementation
+// RealOSPlatform returns a platform implementation backed by the real OS.
 func RealOSPlatform() *Platform {
 	return &Platform{
 		Stdout:  os.Stdout,
@@ -70,7 +60,7 @@ func RealOSPlatform() *Platform {
 		Process: &osProcessInfo{},
 		Execute: func(name string, args ...string) error {
 			cmd := exec.Command(name, args...)
-			cmd.Stdout = os.Stdout // Uncomment to see mkcert output
+			cmd.Stdout = os.Stdout
 			cmd.Stderr = os.Stderr
 			return cmd.Run()
 		},
@@ -126,8 +116,7 @@ type ProcessInfo interface {
 	IsProcessAlive(pid int) bool
 }
 
-type osProcessInfo struct {
-}
+type osProcessInfo struct{}
 
 func (pi *osProcessInfo) IsProcessAlive(pid int) bool {
 	process, err := os.FindProcess(pid)
@@ -135,30 +124,21 @@ func (pi *osProcessInfo) IsProcessAlive(pid int) bool {
 		return false
 	}
 
-	// Signal(0) doesn't send a signal, but performs error checking.
 	err = process.Signal(syscall.Signal(0))
 
 	if err == nil {
-		// On both Linux and macOS, nil error means the process exists
-		// and we have permission to talk to it.
 		return true
 	}
 
 	if runtime.GOOS == "darwin" || runtime.GOOS == "linux" {
-		// If we get EPERM (Operation not permitted), the process IS alive.
-		// It just means it's owned by another user (like root).
 		if errors.Is(err, syscall.EPERM) {
 			return true
 		}
-
-		// If we get ESRCH (No such process), it's definitely dead.
 		if errors.Is(err, syscall.ESRCH) {
 			return false
 		}
 	}
 
-	// On macOS, FindProcess always succeeds, so we rely entirely on
-	// the Signal results above. If we get here, the process is likely dead.
 	return false
 }
 
@@ -189,7 +169,7 @@ func checkMacDNSSetup() *DNSStatus {
 	dnsMode := ""
 	dnsConfig, err := os.ReadFile("/etc/resolver/locals")
 	hasFile := err == nil && len(dnsConfig) > 0
-	hasAlias := platform.IsIPOnInterface("lo0", DefaultDNSListen)
+	hasAlias := IsIPOnInterface("lo0", DefaultDNSListen)
 
 	switch {
 	case hasFile && hasAlias:
