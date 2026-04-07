@@ -54,14 +54,13 @@ func off(p *platform.Platform, localsDir string, dryrun, wipe bool) error {
 		return fmt.Errorf("failed to %sinstall mkcert: %w", qual, err)
 	}
 	if wipe {
-		files, err := filepath.Glob(filepath.Join(cfg.LocalsDir, "web", "*.json"))
-		if err != nil {
-			return fmt.Errorf("failed to list web JSON files: %w", err)
+		serviceFiles := filepath.Join(localsDir, "web", "*.json")
+		if err := safeSudoRemoves(dryrun, serviceFiles); err != nil {
+			return fmt.Errorf("failed to %swipe endpoint configs: %w", qual, err)
 		}
-		for _, file := range files {
-			if err := safeSudoRemoves(dryrun, file); err != nil {
-				return fmt.Errorf("failed to %swipe endpoint configs: %w", qual, err)
-			}
+		certFiles := filepath.Join(localsDir, "certs", "*.pem") 
+		if err := safeSudoRemoves(dryrun, certFiles); err != nil {
+			return fmt.Errorf("failed to %swipe service certificates: %w", qual, err)
 		}
 	}
 	return nil
