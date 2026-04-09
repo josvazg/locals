@@ -40,7 +40,7 @@ func RealOSPlatform() *Platform {
 		Stdin:   os.Stdin,
 		Env:     os.Getenv,
 		HomeDir: os.UserHomeDir,
-		IO:      &osFileshandler{},
+		IO:      &osFilesHandler{},
 		Process: &osProcessInfo{},
 		Execute: func(name string, args ...string) error {
 			cmd := exec.Command(name, args...)

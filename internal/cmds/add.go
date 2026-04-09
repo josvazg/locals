@@ -2,6 +2,7 @@ package cmds
 
 import (
 	"fmt"
+	"locals/internal/platform"
 	"log"
 	"path/filepath"
 
@@ -17,7 +18,7 @@ const (
 }`
 )
 
-func addCmd(localsDir string) *cobra.Command {
+func addCmd(p *platform.Platform, localsDir string) *cobra.Command {
 	var dryrun bool
 	cmd := &cobra.Command{
 		Use:   "add service endpoint",
@@ -33,14 +34,14 @@ func addCmd(localsDir string) *cobra.Command {
 			if dryrun {
 				log.Printf("DRYRUN")
 			}
-			return add(localsDir, domain, targetURL, dryrun)
+			return add(p, localsDir, domain, targetURL, dryrun)
 		},
 	}
 	cmd.Flags().BoolVarP(&dryrun, "dryrun", "", false, "show what start would have done")
 	return cmd
 }
 
-func add(localsDir, domain, targetURL string, dryrun bool) error {
+func add(p *platform.Platform, localsDir, domain, targetURL string, dryrun bool) error {
 	certFile := filepath.Join(localsDir, "certs", fmt.Sprintf("%s.pem", domain))
 	keyFile := filepath.Join(localsDir, "certs", fmt.Sprintf("%s-key.pem", domain))
 	if err := run(dryrun, "mkcert",
@@ -50,7 +51,7 @@ func add(localsDir, domain, targetURL string, dryrun bool) error {
 	}
 	domainCfgFile := filepath.Join(localsDir, "web", fmt.Sprintf("%s.json", domain))
 	domainCfgJSON := fmt.Sprintf(domainConfig, domain, targetURL, certFile, keyFile)
-	if err := heredoc(dryrun, domainCfgJSON, domainCfgFile); err != nil {
+	if err := p.IO.CreateFile(dryrun, domainCfgFile, domainCfgJSON); err != nil {
 		return fmt.Errorf("failed to setup web redirection for domain %s: %w", domain, err)
 	}
 	log.Printf("▶️ Added access to %s -> %s", domain, targetURL)

@@ -3,9 +3,7 @@ package cmds
 import (
 	"fmt"
 	"log"
-	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
 	"syscall"
 )
@@ -35,35 +33,6 @@ func readOutput(cmd string, args ...string) (string, error) {
 
 func test(cmd string, args ...string) bool {
 	return run(false, cmd, args...) == nil
-}
-
-func safeSudoRemoves(dryrun bool, filenames ...string) error {
-	for _, filename := range filenames {
-		if strings.HasSuffix(strings.TrimSpace(filename), "/") {
-			return fmt.Errorf("refusing unsafe removal of possible dir %q", filename)
-		}
-	}
-	rmArgs := append([]string{"sudo", "rm", "-f"}, filenames...)
-	return run(dryrun, "sudo", rmArgs...)
-}
-
-func heredoc(dryrun bool, heredoc, filename string) error {
-	dir := filepath.Dir(filename)
-	if !pathExists(dir) {
-		log.Printf("Creating missing directory: %s", dir)
-		if err := run(dryrun, "sudo", "mkdir", "-p", dir); err != nil {
-			return fmt.Errorf("failed to create missing dir: %w", err)
-		}
-	}
-	if dryrun {
-		log.Printf("sudo tee \"%s\" > /dev/null <<EOF\n%s\nEOF", filename, heredoc)
-		return nil
-	}
-	cmd := exec.Command("sudo", "tee", filename)
-	cmd.Stdin = strings.NewReader(heredoc)
-	cmd.Stdout = nil
-	cmd.Stderr = os.Stderr
-	return cmd.Run()
 }
 
 func launch(dryrun bool, cmd string, args ...string) (int, error) {

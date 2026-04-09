@@ -35,8 +35,8 @@ func Run(ctx context.Context, p *platform.Platform, args []string) error {
 	rootCmd.AddCommand(
 		onCmd(p, cfgDir),
 		offCmd(p, cfgDir),
-		addCmd(cfgDir),
-		rmCmd(cfgDir),
+		addCmd(p, cfgDir),
+		rmCmd(p, cfgDir),
 		dnsCmd(ctx, p),
 		webCmd(ctx, p, cfgDir),
 		statusCmd(p, cfgDir),
@@ -63,7 +63,7 @@ func initFileSystem(p *platform.Platform, cfgDir string) error {
 
 	for _, d := range dirs {
 		path := filepath.Join(cfgDir, d)
-		if err := p.IO.MkdirAll(path, 0755); err != nil {
+		if err := p.IO.CreateDir(false, path); err != nil {
 			return fmt.Errorf("failed to create config subdir: %w", err)
 		}
 	}

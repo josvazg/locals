@@ -41,7 +41,7 @@ func off(p *platform.Platform, localsDir string, dryrun, wipe bool) error {
 	if dryrun {
 		qual = "dryrun "
 	}
-	if err := unconfigureDNS(&cfg, dryrun); err != nil {
+	if err := unconfigureDNS(p, &cfg, dryrun); err != nil {
 		return fmt.Errorf("failed to %sunconfigure DNS config: %w", qual, err)
 	}
 	if err := stopService("dns", &cfg, dryrun); err != nil {
@@ -54,26 +54,34 @@ func off(p *platform.Platform, localsDir string, dryrun, wipe bool) error {
 		return fmt.Errorf("failed to %sinstall mkcert: %w", qual, err)
 	}
 	if wipe {
-		serviceFiles := filepath.Join(localsDir, "web", "*.json")
-		if err := safeSudoRemoves(dryrun, serviceFiles); err != nil {
+		serviceFiles, err := p.IO.ListFiles(filepath.Join(localsDir, "web", "*.json"))
+		if err != nil {
+			return fmt.Errorf("failed to list cert files: %w", err)
+		}
+		if err := p.IO.RemoveFiles(dryrun, serviceFiles...); err != nil {
 			return fmt.Errorf("failed to %swipe endpoint configs: %w", qual, err)
 		}
-		certFiles := filepath.Join(localsDir, "certs", "*.pem") 
-		if err := safeSudoRemoves(dryrun, certFiles); err != nil {
+		log.Printf("removed %s", serviceFiles)
+		certFiles, err := p.IO.ListFiles(filepath.Join(localsDir, "certs", "*.pem"))
+		if err != nil {
+			return fmt.Errorf("failed to list cert files: %w", err)
+		}
+		if err := p.IO.RemoveFiles(dryrun, certFiles...); err != nil {
 			return fmt.Errorf("failed to %swipe service certificates: %w", qual, err)
 		}
+		log.Printf("removed %s", certFiles)
 	}
 	return nil
 }
 
-func unconfigureDNS(cfg *Config, dryrun bool) error {
+func unconfigureDNS(p *platform.Platform, cfg *Config, dryrun bool) error {
 	if runtime.GOOS == "darwin" {
-		return unconfigureMacDNS(cfg, dryrun)
+		return unconfigureMacDNS(p, cfg, dryrun)
 	}
-	return unconfigureLinuxDNS(dryrun)
+	return unconfigureLinuxDNS(p, dryrun)
 }
 
-func unconfigureLinuxDNS(dryrun bool) error {
+func unconfigureLinuxDNS(p *platform.Platform, dryrun bool) error {
 	if test("mountpoint", "-q", "/etc/resolv.conf") {
 		if err := run(dryrun, "sudo", "umount", "/etc/resolv.conf"); err != nil {
 			return fmt.Errorf("failed to undo mount bind on /etc/resolv.conf: %w", err)
@@ -81,19 +89,19 @@ func unconfigureLinuxDNS(dryrun bool) error {
 	} else {
 		log.Printf("ℹ️ /etc/resolv.conf was not mounted.")
 	}
-	if err := safeSudoRemoves(dryrun, resolverConf); err != nil {
+	if err := p.IO.RemoveFiles(dryrun, resolverConf); err != nil {
 		return fmt.Errorf("failed to remove resolved config: %w", err)
 	}
 	return nil
 }
 
-func unconfigureMacDNS(state *Config, dryrun bool) error {
+func unconfigureMacDNS(p *platform.Platform, state *Config, dryrun bool) error {
 	if platform.IsIPOnInterface("lo0", state.DNSListen) {
 		if err := run(dryrun, "sudo", "ifconfig", "lo0", "-alias", state.DNSListen); err != nil {
 			return fmt.Errorf("failed to remove lo0 DNS redirect: %w", err)
 		}
 	}
-	if err := safeSudoRemoves(dryrun, resolverMacLocalsFile); err != nil {
+	if err := p.IO.RemoveFiles(dryrun, resolverMacLocalsFile); err != nil {
 		return fmt.Errorf("failed to remove locals resolver file %q: %w",
 			resolverMacLocalsFile, err)
 	}

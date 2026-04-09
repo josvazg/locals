@@ -74,7 +74,7 @@ func on(p *platform.Platform, localsDir string, dryrun bool) error {
 	if err := launchDNS(&state, dryrun); err != nil {
 		return fmt.Errorf("failed to %slaunch embedded DNS server: %w", qual, err)
 	}
-	if err := configureDNS(&state, dryrun); err != nil {
+	if err := configureDNS(p, &state, dryrun); err != nil {
 		return fmt.Errorf("failed to %sconfigure system DNS: %w", qual, err)
 	}
 	if err := launchWeb(&state, dryrun); err != nil {
@@ -131,14 +131,14 @@ func launchDNS(cfg *Config, dryrun bool) error {
 	return nil
 }
 
-func configureDNS(cfg *Config, dryrun bool) error {
+func configureDNS(p *platform.Platform, cfg *Config, dryrun bool) error {
 	if runtime.GOOS == "darwin" {
-		return configureMacDNS(cfg, dryrun)
+		return configureMacDNS(p, cfg, dryrun)
 	}
-	return configureLinuxDNS(cfg, dryrun)
+	return configureLinuxDNS(p, cfg, dryrun)
 }
 
-func configureMacDNS(cfg *Config, dryrun bool) error {
+func configureMacDNS(p *platform.Platform, cfg *Config, dryrun bool) error {
 	if !platform.IsIPOnInterface("lo0", cfg.DNSListen) {
 		err := run(dryrun, "sudo", "ifconfig", "lo0", "alias",
 			cfg.DNSListen, "netmask", "255.255.255.255")
@@ -147,24 +147,24 @@ func configureMacDNS(cfg *Config, dryrun bool) error {
 		}
 	}
 	resolverCfg := fmt.Sprintf("nameserver %s\nport 53\n", cfg.DNSListen)
-	if err := heredoc(dryrun, resolverCfg, resolverMacLocalsFile); err != nil {
+	if err := p.IO.CreateFile(dryrun, resolverMacLocalsFile, resolverCfg); err != nil {
 		return fmt.Errorf("failed to write resolver config: %w", err)
 	}
 	return nil
 }
 
-func configureLinuxDNS(cfg *Config, dryrun bool) error {
+func configureLinuxDNS(p *platform.Platform, cfg *Config, dryrun bool) error {
 	if pathExists("/run/systemd/resolve") && test("systemctl", "is-active", "systemd-resolved") {
-		return configureLinuxResolved(cfg, dryrun)
+		return configureLinuxResolved(p, cfg, dryrun)
 	}
 	log.Printf("📡 systemd-resolved not found. Falling back to /etc/resolv.conf bind-mount.")
-	return configureLinuxBindMount(cfg, dryrun)
+	return configureLinuxBindMount(p, cfg, dryrun)
 }
 
-func configureLinuxResolved(cfg *Config, dryrun bool) error {
+func configureLinuxResolved(p *platform.Platform, cfg *Config, dryrun bool) error {
 	log.Printf("📡 systemd-resolved detected. Using Routing Domain setup.")
 	localsResolvedCfg := fmt.Sprintf("[Resolve]\nDNS=%s\nDomains=~locals\n", cfg.DNSListen)
-	if err := heredoc(dryrun, localsResolvedCfg, resolverConf); err != nil {
+	if err := p.IO.CreateFile(dryrun, resolverConf, localsResolvedCfg); err != nil {
 		return fmt.Errorf("failed to configure locals resolved: %w", err)
 	}
 	if err := run(dryrun, "sudo", "systemctl", "restart", "systemd-resolved"); err != nil {
@@ -174,14 +174,14 @@ func configureLinuxResolved(cfg *Config, dryrun bool) error {
 	return nil
 }
 
-func configureLinuxBindMount(cfg *Config, dryrun bool) error {
+func configureLinuxBindMount(p *platform.Platform, cfg *Config, dryrun bool) error {
 	if test("mountpoint", "-q", "/etc/resolv.conf") {
 		log.Printf("⚠️ /etc/resolv.conf already replaced. Skipping.")
 		return nil
 	}
 	resolvConfLocal := filepath.Join(cfg.LocalsDir, "resolv.patched.conf")
 	resolvCfg := fmt.Sprintf("nameserver %s\noptions edns0 trust-ad", cfg.DNSListen)
-	if err := heredoc(dryrun, resolvCfg, resolvConfLocal); err != nil {
+	if err := p.IO.CreateFile(dryrun, resolvConfLocal, resolvCfg); err != nil {
 		return fmt.Errorf("failed to create alternate resolv.conf: %w", err)
 	}
 	if err := run(dryrun, "sudo", "mount", "--bind", resolvConfLocal, "/etc/resolv.conf"); err != nil {

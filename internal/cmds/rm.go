@@ -2,13 +2,14 @@ package cmds
 
 import (
 	"fmt"
+	"locals/internal/platform"
 	"log"
 	"path/filepath"
 
 	"github.com/spf13/cobra"
 )
 
-func rmCmd(localsDir string) *cobra.Command {
+func rmCmd(p *platform.Platform, localsDir string) *cobra.Command {
 	var dryrun bool
 	cmd := &cobra.Command{
 		Use:   "rm service",
@@ -23,21 +24,21 @@ func rmCmd(localsDir string) *cobra.Command {
 			if dryrun {
 				log.Printf("DRYRUN")
 			}
-			return rm(dryrun, domain, localsDir)
+			return rm(p, dryrun, domain, localsDir)
 		},
 	}
 	cmd.Flags().BoolVarP(&dryrun, "dryrun", "", false, "show what start would have done")
 	return cmd
 }
 
-func rm(dryrun bool, domain, localsDir string) error {
+func rm(p *platform.Platform, dryrun bool, domain, localsDir string) error {
 	domainCfgFile := filepath.Join(localsDir, "web", fmt.Sprintf("%s.json", domain))
-	if err := safeSudoRemoves(dryrun, domainCfgFile); err != nil {
+	if err := p.IO.RemoveFiles(dryrun, domainCfgFile); err != nil {
 		return fmt.Errorf("failed to remove domain %s config file: %w", domain, err)
 	}
 	certFile := filepath.Join(localsDir, "certs", fmt.Sprintf("%s.pem", domain))
 	keyFile := filepath.Join(localsDir, "certs", fmt.Sprintf("%s-key.pem", domain))
-	if err := safeSudoRemoves(dryrun, certFile, keyFile); err != nil {
+	if err := p.IO.RemoveFiles(dryrun, certFile, keyFile); err != nil {
 		return fmt.Errorf("failed to remove domain %s keys and certificates: %w", domain, err)
 	}
 	log.Printf("⏹️ Removed access to %s", domain)
