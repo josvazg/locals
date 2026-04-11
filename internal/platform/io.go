@@ -13,15 +13,16 @@ import (
 type FilesHandler interface {
 	ReadFile(filename string) ([]byte, error)
 	ReadDir(dirname string) ([]fs.DirEntry, error)
-	CreateFile(dryrun bool, filename, content string) error
-	CreateDir(dryrun bool, filename string) error
-	RemoveFiles(dryrun bool, filenames ... string) error
-	ListFiles(globs ... string) ([]string, error)
+	CreateFile(filename, content string) error
+	CreateDir(filename string) error
+	RemoveFiles(filenames ...string) error
+	ListFiles(globs ...string) ([]string, error)
+	PathExists(path string) bool
 }
 
 type osFilesHandler struct{}
 
-func OSFileHandler() *osFilesHandler {
+func newOSFilesHandler() *osFilesHandler {
 	return &osFilesHandler{}
 }
 
@@ -29,17 +30,13 @@ func (osf *osFilesHandler) ReadFile(filename string) ([]byte, error) {
 	return os.ReadFile(filename)
 }
 
-func (osf *osFilesHandler) CreateFile(dryrun bool, filename, content string) error {
+func (osf *osFilesHandler) CreateFile(filename, content string) error {
 	dir := filepath.Dir(filename)
 	if !osf.PathExists(dir) {
 		log.Printf("Creating missing directory: %s", dir)
-		if err := osf.CreateDir(dryrun, dir); err != nil {
+		if err := osf.CreateDir(dir); err != nil {
 			return fmt.Errorf("failed to create missing dir: %w", err)
 		}
-	}
-	if dryrun {
-		log.Printf("DRYRUN: would have created file %q as:\n------\n%s\n------", filename, content)
-		return nil
 	}
 	return os.WriteFile(filename, ([]byte)(content), 0600)
 }
@@ -52,11 +49,7 @@ func (osf *osFilesHandler) ReadDir(dirname string) ([]fs.DirEntry, error) {
 	return os.ReadDir(dirname)
 }
 
-func (osf *osFilesHandler) CreateDir(dryrun bool, dir string) error {
-	if dryrun {
-		log.Printf("DRYRUN: would have created dir %q", dir)
-		return nil
-	}
+func (osf *osFilesHandler) CreateDir(dir string) error {
 	return osf.MkdirAll(dir, 0750)
 }
 
@@ -73,9 +66,9 @@ func (osf *osFilesHandler) Stat(filename string) (os.FileInfo, error) {
 	return os.Stat(filename)
 }
 
-func (osf *osFilesHandler) RemoveFiles(dryrun bool, filenames ...string) error {
+func (osf *osFilesHandler) RemoveFiles(filenames ...string) error {
 	for _, filename := range filenames {
-		if err := osf.removeFile(dryrun, filename); err != nil {
+		if err := osf.removeFile(filename); err != nil {
 			if errors.Is(err, os.ErrNotExist) {
 				return nil // if it was already gone, we are done, we are good
 			}
@@ -85,18 +78,14 @@ func (osf *osFilesHandler) RemoveFiles(dryrun bool, filenames ...string) error {
 	return nil
 }
 
-func (osf *osFilesHandler) removeFile(dryrun bool, filename string) error {
+func (osf *osFilesHandler) removeFile(filename string) error {
 	if strings.HasSuffix(strings.TrimSpace(filename), "/") {
 		return fmt.Errorf("refusing unsafe removal of possible dir %q", filename)
-	}
-	if dryrun {
-		log.Printf("DRYRUN: would have removed file %s", filename)
-		return nil	
 	}
 	return os.Remove(filename)
 }
 
-func (osf *osFilesHandler) ListFiles(globs ... string) ([]string, error) {
+func (osf *osFilesHandler) ListFiles(globs ...string) ([]string, error) {
 	paths := []string{}
 	for _, glob := range globs {
 		matches, err := filepath.Glob(glob)
