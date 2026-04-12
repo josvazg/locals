@@ -18,6 +18,7 @@ type FilesHandler interface {
 	RemoveFiles(filenames ...string) error
 	ListFiles(globs ...string) ([]string, error)
 	PathExists(path string) bool
+	TempDir() string
 }
 
 type osFilesHandler struct{}
@@ -104,4 +105,20 @@ func (osf *osFilesHandler) ListFiles(globs ...string) ([]string, error) {
 
 func (osf *osFilesHandler) Remove(filename string) error {
 	return os.Remove(filename)
+}
+
+func (_ *osFilesHandler) TempDir() string {
+	return os.TempDir()
+}
+
+func Find(io FilesHandler, filename, pattern string) (bool, error) {
+	contents, err := io.ReadFile(filename)
+	if err != nil {
+		return false, fmt.Errorf("failed to read file %q: %v", filename, contents)
+	}
+	return strings.Contains(string(contents), pattern), nil
+}
+
+func DNSConfigFile(localsDir string) string {
+	return filepath.Join(localsDir, "resolv.patched.conf")
 }

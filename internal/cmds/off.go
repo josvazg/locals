@@ -5,7 +5,6 @@ import (
 	"locals/internal/platform"
 	"log"
 	"path/filepath"
-	"runtime"
 	"strconv"
 	"strings"
 
@@ -75,53 +74,15 @@ func off(p platform.Platform, localsDir string, wipe, dryrun bool) error {
 	return nil
 }
 
-func unconfigureDNS(p platform.Platform, cfg *Config) error {
-	if runtime.GOOS == "darwin" {
-		return unconfigureMacDNS(p, cfg)
-	}
-	return unconfigureLinuxDNS(p)
-}
-
-func unconfigureLinuxDNS(p platform.Platform) error {
-	resolvConfMounted, err := find(p, "/proc/self/mountinfo", "/etc/resolv.conf")
-	if err != nil {
-		return fmt.Errorf("failed to check for mountinfo: %w", err)
-	}
-	if resolvConfMounted {
-		if _, err := p.Proc().Run("sudo", "umount", "/etc/resolv.conf"); err != nil {
-			return fmt.Errorf("failed to undo mount bind on /etc/resolv.conf: %w", err)
-		}
-	} else {
-		log.Printf("ℹ️ /etc/resolv.conf was not mounted.")
-	}
-	if err := p.IO().RemoveFiles(resolverConf); err != nil {
-		return fmt.Errorf("failed to remove resolved config: %w", err)
-	}
-	return nil
-}
-
-func unconfigureMacDNS(p platform.Platform, state *Config) error {
-	if platform.IsIPOnInterface("lo0", state.DNSListen) {
-		if _, err := p.Proc().Run("sudo", "ifconfig", "lo0", "-alias", state.DNSListen); err != nil {
-			return fmt.Errorf("failed to remove lo0 DNS redirect: %w", err)
-		}
-	}
-	if err := p.IO().RemoveFiles(resolverMacLocalsFile); err != nil {
-		return fmt.Errorf("failed to remove locals resolver file %q: %w",
-			resolverMacLocalsFile, err)
-	}
-	return nil
-}
-
 func stopService(p platform.Platform, service string, cfg *Config) error {
 	pidFile := filepath.Join(cfg.LocalsDir, fmt.Sprintf("%s.pid", service))
-	pid := readPIDFromFile(pidFile)
+	pid := readPIDFromFile(p, pidFile)
 	if pid < 0 {
 		log.Printf("ℹ️ No %s PID file found. Nothing to kill.", service)
 		return nil
 	}
 
-	if processExistsForPID(pid) {
+	if p.Proc().IsProcessAlive(pid) {
 		if _, err := p.Proc().Run("sudo", "kill", strconv.Itoa(pid)); err != nil {
 			return fmt.Errorf("failed to stop locals %s (pid %d): %w", service, pid, err)
 		}

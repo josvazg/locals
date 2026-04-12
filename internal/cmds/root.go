@@ -28,10 +28,11 @@ func Run(ctx context.Context, p platform.Platform, args []string) error {
 	}
 	rootCmd.SetOut(p.Stdout())
 	rootCmd.SetErr(p.Stderr())
-	rootCmd.SetArgs(args)
+	rootCmd.SetArgs(args[1:])
 
+	binary := args[0]
 	rootCmd.AddCommand(
-		onCmd(p, cfgDir),
+		onCmd(p, cfgDir, binary),
 		offCmd(p, cfgDir),
 		addCmd(p, cfgDir),
 		rmCmd(p, cfgDir),

@@ -26,7 +26,7 @@ func statusCmd(p platform.Platform, localsDir string) *cobra.Command {
 func status(p platform.Platform, configDir string) error {
 	fmt.Println("----------- 📍 Locals Status -----------")
 
-	dnsStatus := p.CheckDNSSetup()
+	dnsStatus := p.CheckDNSSetup(configDir)
 	fmt.Printf("DNS System:  %s\n", dnsStatus)
 
 	if isProcessAlive(p, filepath.Join(configDir, "dns.pid")) {

@@ -25,7 +25,7 @@ type Platform interface {
 	IO() FilesHandler
 	Proc() Proc
 	Run(name string, args ...string) (string, error)
-	CheckDNSSetup() *DNSStatus
+	CheckDNSSetup(configDir string) *DNSStatus
 }
 
 type osPlatform struct {
@@ -63,8 +63,8 @@ func (_ *osPlatform) Run(cmd string, args ...string) (string, error) {
 	return run(cmd, args...)
 }
 
-func (_ *osPlatform) CheckDNSSetup() *DNSStatus {
-	return checkDNSSetup()
+func (p *osPlatform) CheckDNSSetup(configDir string) *DNSStatus {
+	return checkDNSSetup(p.IO(), configDir)
 }
 
 // NewOSPlatform returns a platform implementation backed by the real OS.

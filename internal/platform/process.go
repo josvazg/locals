@@ -31,16 +31,16 @@ func (_ *osProc) IsProcessAlive(pid int) bool {
 }
 
 func run(cmd string, args ...string) (string, error) {
+	fullCmd := fullCmd(cmd, args...)
 	out, err := exec.Command(cmd, args...).CombinedOutput()
 	if err != nil {
-		cli := strings.Join(append([]string{cmd}, args...), " ")
-		return "", fmt.Errorf("failed to run %s: %w", cli, err)
+		return "", fmt.Errorf("failed to run %s: %w", fullCmd, err)
 	}
 	return string(out), err
 }
 
 func launch(cmd string, args ...string) (int, error) {
-	cli := strings.Join(append([]string{cmd}, args...), " ")
+	fullCmd := fullCmd(cmd, args...)
 	command := exec.Command(cmd, args...)
 	// FIX: Disconnect the background process from the test's pipes.
 	// This prevents the parent 'CombinedOutput' from hanging.
@@ -52,12 +52,15 @@ func launch(cmd string, args ...string) (int, error) {
 		Pgid:    0,
 	}
 	if err := command.Start(); err != nil {
-		return -1, fmt.Errorf("failed to launch %q: %w", cli, err)
+		return -1, fmt.Errorf("failed to launch %q: %w", fullCmd, err)
 	}
 
 	// Release allows the Go test to "forget" the process
 	pid := command.Process.Pid
 	command.Process.Release()
+	if !isProcessAlive(pid) {
+		return -1, fmt.Errorf("failed to launch %q: pid %d not running", fullCmd, pid)
+	}
 
 	return pid, nil
 }
@@ -83,4 +86,8 @@ func isProcessAlive(pid int) bool {
 		}
 	}
 	return false
+}
+
+func fullCmd(cmd string, args ...string) string {
+	return strings.Join(append([]string{cmd}, args...), " ")
 }

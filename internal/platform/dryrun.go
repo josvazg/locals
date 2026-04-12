@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log"
 	"path/filepath"
-	"strings"
 )
 
 type dryrunPlatform struct {
@@ -19,8 +18,8 @@ func (dp *dryrunPlatform) IO() FilesHandler {
 	return &dryrunIO{FilesHandler: dp.Platform.IO()}
 }
 
-func (_ *dryrunPlatform) Proc() Proc {
-	return &dryrunProc{}
+func (dp *dryrunPlatform) Proc() Proc {
+	return &dryrunProc{Proc: dp.Platform.Proc()}
 }
 
 type dryrunProc struct {
@@ -36,14 +35,12 @@ func (_ *dryrunProc) Launch(cmd string, args ...string) (int, error) {
 }
 
 func dryRun(cmd string, args ...string) (string, error) {
-	cli := strings.Join(append([]string{cmd}, args...), " ")
-	log.Printf("DRYRUN: %s", cli)
+	log.Printf("DRYRUN: %s", fullCmd(cmd, args...))
 	return "", nil
 }
 
 func dryrunLaunch(cmd string, args ...string) (int, error) {
-	cli := strings.Join(append([]string{cmd}, args...), " ")
-	log.Printf("DRYRUN %s", cli)
+	log.Printf("DRYRUN LAUNCH: %s", fullCmd(cmd, args...))
 	return -1, nil
 }
 
