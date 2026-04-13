@@ -1,6 +1,9 @@
 package cmds
 
 import (
+	"bufio"
+	"bytes"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"locals/internal/platform"
@@ -120,9 +123,14 @@ func launchDNS(p platform.Platform, cfg *Config) error {
 			return fmt.Errorf("failed to remove PID file %q: %w", pidFile, err)
 		}
 	}
-	pid, err := p.Proc().Launch("sudo", "env", fmt.Sprintf("PATH=%s",p.Env("PATH")), 
-	    "nohup", cfg.LocalsBin,
-		"dns", cfg.DNSListen,
+	dnsServers, err := currentDNSServers(p)
+	if err != nil {
+		return fmt.Errorf("failed to detect fallback DNS servers: %w", err)
+	}
+	fallbacks := strings.Join(dnsServers, ",")
+	pid, err := p.Proc().Launch("sudo", "env", fmt.Sprintf("PATH=%s", p.Env("PATH")),
+		"nohup", cfg.LocalsBin,
+		"dns", cfg.DNSListen, fallbacks,
 		"--log", filepath.Join(p.IO().TempDir(), "locals-dns.log"))
 	if err != nil {
 		return fmt.Errorf("failed to launch embedded DNS server: %w", err)
@@ -132,6 +140,29 @@ func launchDNS(p platform.Platform, cfg *Config) error {
 	}
 	log.Printf("✅ locals DNS started on %s (PID: %d)", cfg.DNSListen, pid)
 	return nil
+}
+
+func currentDNSServers(p platform.Platform) ([]string, error) {
+	resolvConfCfg, err := p.IO().ReadFile("/etc/resolv.conf")
+	if err != nil {
+		return nil, fmt.Errorf("failed to read /etc/resolv.conf: %w", err)
+	}
+	var servers []string
+	scanner := bufio.NewScanner(bytes.NewReader(resolvConfCfg))
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" || strings.HasPrefix(line, "#") || strings.HasPrefix(line, ";") {
+			continue
+		}
+		fields := strings.Fields(line)
+		if len(fields) >= 2 && fields[0] == "nameserver" {
+			servers = append(servers, fields[1])
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("error scanning /etc/resolv.conf: %w", err)
+	}
+	return servers, nil
 }
 
 func isUsingSystemdResolved(p platform.Platform) bool {
@@ -215,7 +246,15 @@ func probeDNS(p platform.Platform, dnsListen string) error {
 }
 
 func probeWeb(p platform.Platform, webListen string) error {
-	conn, err := net.DialTimeout("tcp", completeAddress(webListen, 443), 2*time.Second)
+	dialer := &net.Dialer{
+		Timeout: 2 * time.Second,
+	}
+	conf := &tls.Config{
+		InsecureSkipVerify: true,
+		ServerName: "probe",
+	}
+	address := completeAddress(webListen, 443)
+	conn, err := tls.DialWithDialer(dialer, "tcp", address, conf)
 	if err != nil {
 		return fmt.Errorf("probe failed, check failure at %s/locals-web.log: %w", p.IO().TempDir(), err)
 	}

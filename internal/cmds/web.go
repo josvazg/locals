@@ -2,12 +2,17 @@ package cmds
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
 	"crypto/tls"
+	"crypto/x509"
+	"crypto/x509/pkix"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"locals/internal/platform"
 	"log"
+	"math/big"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -84,7 +89,7 @@ func (s *proxyStore) ListHosts() []string {
 	s.m.RLock()
 	defer s.m.RUnlock()
 	hosts := []string{}
-	for h := range s.routes {
+	for h := range s.certs {
 		hosts = append(hosts, h)
 	}
 	return hosts
@@ -181,6 +186,7 @@ func loadConfig(p platform.Platform, store ProxyStore, webDir string) error {
 		return fmt.Errorf("failed to list web JSON files: %w", err)
 	}
 	hosts := map[string]struct{}{}
+	ensureProbeCert(store, hosts)
 	for _, f := range files {
 		data, err := p.IO().ReadFile(f)
 		if err != nil {
@@ -213,6 +219,49 @@ func loadConfig(p platform.Platform, store ProxyStore, webDir string) error {
 		}
 	}
 	return nil
+}
+
+func ensureProbeCert(store ProxyStore, hosts map[string]struct{}) error {
+	crt, err := store.Cert("probe")
+	if err != nil && !errors.Is(err, ErrNotFound) {
+		return fmt.Errorf("failed to check probe cert: %w", err)
+	}
+	if crt == nil {
+		store.AddEndpoint("probe", nil, newProbeCert())
+	}
+	hosts["probe"] = struct{}{}
+	return nil
+}
+
+func newProbeCert() *tls.Certificate {
+	priv, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		return nil
+	}
+	serialNumber, _ := rand.Int(rand.Reader, new(big.Int).Lsh(big.NewInt(1), 128))
+	template := x509.Certificate{
+		SerialNumber: serialNumber,
+		Subject: pkix.Name{
+			Organization: []string{"locals-internal"},
+			CommonName:   "probe",
+		},
+		NotBefore: time.Now(),
+		NotAfter:  time.Now().Add(time.Hour * 24 * 365), // 1 year
+		KeyUsage: x509.KeyUsageKeyEncipherment |
+			x509.KeyUsageDigitalSignature,
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+		BasicConstraintsValid: true,
+		DNSNames:              []string{"probe"},
+	}
+	derBytes, err := x509.CreateCertificate(
+		rand.Reader, &template, &template, &priv.PublicKey, priv)
+	if err != nil {
+		return nil
+	}
+	return &tls.Certificate{
+		Certificate: [][]byte{derBytes},
+		PrivateKey:  priv,
+	}
 }
 
 func ensureProtocol(addr string) string {
@@ -249,7 +298,7 @@ func reverseProxy(store ProxyStore) func(http.ResponseWriter, *http.Request) {
 func getCertificate(store ProxyStore) func(*tls.ClientHelloInfo) (*tls.Certificate, error) {
 	return func(hello *tls.ClientHelloInfo) (*tls.Certificate, error) {
 		if cert, err := store.Cert(hello.ServerName); err != nil {
-			return nil, fmt.Errorf("no certificate for %s: %w", hello.ServerName, err)
+			return nil, fmt.Errorf("no certificate for %s: %w\n%v", hello.ServerName, err, store.ListHosts())
 		} else {
 			return cert, nil
 		}
