@@ -51,7 +51,7 @@ func off(p platform.Platform, localsDir string, wipe, dryrun bool) error {
 		return fmt.Errorf("failed to %sstop embedded web server: %w", qual, err)
 	}
 	if err := uninstallMkcert(p); err != nil {
-		return fmt.Errorf("failed to %sinstall mkcert: %w", qual, err)
+		return fmt.Errorf("failed to %sdisable mkcert: %w", qual, err)
 	}
 	if wipe {
 		serviceFiles, err := p.IO().ListFiles(filepath.Join(localsDir, "web", "*.json"))
@@ -61,7 +61,7 @@ func off(p platform.Platform, localsDir string, wipe, dryrun bool) error {
 		if err := p.IO().RemoveFiles(serviceFiles...); err != nil {
 			return fmt.Errorf("failed to %swipe endpoint configs: %w", qual, err)
 		}
-		log.Printf("removed %s", serviceFiles)
+		log.Printf("Wiped %d service files", len(serviceFiles))
 		certFiles, err := p.IO().ListFiles(filepath.Join(localsDir, "certs", "*.pem"))
 		if err != nil {
 			return fmt.Errorf("failed to list cert files: %w", err)
@@ -69,7 +69,7 @@ func off(p platform.Platform, localsDir string, wipe, dryrun bool) error {
 		if err := p.IO().RemoveFiles(certFiles...); err != nil {
 			return fmt.Errorf("failed to %swipe service certificates: %w", qual, err)
 		}
-		log.Printf("removed %s", certFiles)
+		log.Printf("Wiped %d cert files", len(certFiles))
 	}
 	return nil
 }

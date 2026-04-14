@@ -5,6 +5,8 @@ package cmds
 import (
 	"fmt"
 	"locals/internal/platform"
+	"path/filepath"
+	"strings"
 )
 
 func configureDNS(p platform.Platform, cfg *Config) error {
@@ -16,8 +18,15 @@ func configureDNS(p platform.Platform, cfg *Config) error {
 		}
 	}
 	resolverCfg := fmt.Sprintf("nameserver %s\nport 53\n", cfg.DNSListen)
-	if err := p.IO().CreateFile(resolverMacLocalsFile, resolverCfg); err != nil {
+	tmpLocalsResolverFile := filepath.Join(p.IO().TempDir(), "locals-resolver.conf")
+	if err := p.IO().CreateFile(tmpLocalsResolverFile, resolverCfg); err != nil {
 		return fmt.Errorf("failed to write resolver config: %w", err)
+	}
+	if _, err := p.Proc().Run("sudo", "cp", tmpLocalsResolverFile, resolverMacLocalsFile); err != nil {
+		return fmt.Errorf("failed to copy resolver config to %s: %w", resolverMacLocalsFile, err)
+	}
+	if _, err := p.Proc().Run("sudo", "chmod", "o+r", resolverMacLocalsFile); err != nil {
+		return fmt.Errorf("failed to make resolver config readable by all: %w", err)
 	}
 	return nil
 }
@@ -28,7 +37,10 @@ func unconfigureDNS(p platform.Platform, state *Config) error {
 			return fmt.Errorf("failed to remove lo0 DNS redirect: %w", err)
 		}
 	}
-	if err := p.IO().RemoveFiles(resolverMacLocalsFile); err != nil {
+	if _, err := p.Proc().Run("sudo", "rm", resolverMacLocalsFile); err != nil {
+		if strings.Contains(err.Error(), "No such file or directory") {
+			return nil
+		}
 		return fmt.Errorf("failed to remove locals resolver file %q: %w",
 			resolverMacLocalsFile, err)
 	}

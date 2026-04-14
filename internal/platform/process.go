@@ -34,7 +34,7 @@ func run(cmd string, args ...string) (string, error) {
 	fullCmd := fullCmd(cmd, args...)
 	out, err := exec.Command(cmd, args...).CombinedOutput()
 	if err != nil {
-		return "", fmt.Errorf("failed to run %s: %w", fullCmd, err)
+		return "", fmt.Errorf("failed to run %s: %w\n%s", fullCmd, err, string(out))
 	}
 	return string(out), err
 }
