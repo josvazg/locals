@@ -110,7 +110,7 @@ func webCmd(ctx context.Context, p platform.Platform, cfgDir string) *cobra.Comm
 		Args:  cobra.RangeArgs(0, 1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if logFile != "" {
-				if err := setupLog(logFile); err != nil {
+				if err := setupLog(p, logFile); err != nil {
 					return fmt.Errorf("failed to setup log file: %w", err)
 				}
 			}

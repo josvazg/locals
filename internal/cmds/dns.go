@@ -35,7 +35,7 @@ func dnsCmd(ctx context.Context, p platform.Platform) *cobra.Command {
 		Args: cobra.RangeArgs(1, 2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if logFile != "" {
-				if err := setupLog(logFile); err != nil {
+				if err := setupLog(p, logFile); err != nil {
 					return fmt.Errorf("failed to setup log file: %w", err)
 				}
 			}
