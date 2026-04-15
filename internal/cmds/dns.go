@@ -24,7 +24,7 @@ const (
 
 var domainSuffix = fmt.Sprintf(".%s.", domain)
 
-func dnsCmd(ctx context.Context, p *platform.Platform) *cobra.Command {
+func dnsCmd(ctx context.Context, p platform.Platform) *cobra.Command {
 	var logFile string
 	cmd := &cobra.Command{
 		Use:   "dns address [fallbacks]",
@@ -114,7 +114,7 @@ func ensurePort(addr string) string {
 	return addr
 }
 
-func fallbacks(p *platform.Platform, args []string, listen string) ([]string, error) {
+func fallbacks(p platform.Platform, args []string, listen string) ([]string, error) {
 	if len(args) > 1 {
 		return strings.Split(args[1], ","), nil
 	}
@@ -125,8 +125,8 @@ func fallbacks(p *platform.Platform, args []string, listen string) ([]string, er
 	return removeIfFound(allNameservers, listen), nil
 }
 
-func nameservers(p *platform.Platform, path string) ([]string, error) {
-	contents, err := p.IO.ReadFile(path)
+func nameservers(p platform.Platform, path string) ([]string, error) {
+	contents, err := p.IO().ReadFile(path)
 	if err != nil {
 		return nil, err
 	}

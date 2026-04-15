@@ -11,7 +11,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func statusCmd(p *platform.Platform, localsDir string) *cobra.Command {
+func statusCmd(p platform.Platform, localsDir string) *cobra.Command {
 	return &cobra.Command{
 		Use:   "status",
 		Short: "Show locals status",
@@ -23,10 +23,10 @@ func statusCmd(p *platform.Platform, localsDir string) *cobra.Command {
 	}
 }
 
-func status(p *platform.Platform, configDir string) error {
+func status(p platform.Platform, configDir string) error {
 	fmt.Println("----------- 📍 Locals Status -----------")
 
-	dnsStatus := p.CheckDNSSetup()
+	dnsStatus := p.CheckDNSSetup(configDir)
 	fmt.Printf("DNS System:  %s\n", dnsStatus)
 
 	if isProcessAlive(p, filepath.Join(configDir, "dns.pid")) {
@@ -44,7 +44,7 @@ func status(p *platform.Platform, configDir string) error {
 	}
 
 	rulesDir := filepath.Join(configDir, "web")
-	files, _ := p.IO.ReadDir(rulesDir)
+	files, _ := p.IO().ReadDir(rulesDir)
 
 	count := 0
 	for _, f := range files {
@@ -52,7 +52,7 @@ func status(p *platform.Platform, configDir string) error {
 			count++
 			name := strings.TrimSuffix(f.Name(), ".json")
 			target := "unknown"
-			if content, err := p.IO.ReadFile(filepath.Join(rulesDir, f.Name())); err == nil {
+			if content, err := p.IO().ReadFile(filepath.Join(rulesDir, f.Name())); err == nil {
 				webConfig := WebConfig{}
 				if err := json.Unmarshal(content, &webConfig); err == nil {
 					name = webConfig.URL
@@ -70,8 +70,8 @@ func status(p *platform.Platform, configDir string) error {
 	return nil
 }
 
-func isProcessAlive(p *platform.Platform, pidPath string) bool {
-	data, err := p.IO.ReadFile(pidPath)
+func isProcessAlive(p platform.Platform, pidPath string) bool {
+	data, err := p.IO().ReadFile(pidPath)
 	if err != nil {
 		return false
 	}
@@ -79,5 +79,5 @@ func isProcessAlive(p *platform.Platform, pidPath string) bool {
 	if _, err := fmt.Sscanf(string(data), "%d", &pid); err != nil {
 		return false
 	}
-	return p.Process.IsProcessAlive(pid)
+	return p.Proc().IsProcessAlive(pid)
 }

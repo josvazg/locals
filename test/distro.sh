@@ -17,4 +17,12 @@ fi
 
 cd /src
 
-nix --extra-experimental-features 'nix-command flakes' develop path:. -c "$@"
+export GODEBUG=netdns=go
+RUN_NIX_FLAKE=(nix --extra-experimental-features 'nix-command flakes' develop path:.)
+if [ $# -eq 0 ] || [ -z "$1" ]; then
+    echo "run shell"
+    "${RUN_NIX_FLAKE[@]}"
+else
+    echo "run command ${*}"
+    "${RUN_NIX_FLAKE[@]}" -c "$@"
+fi

@@ -68,7 +68,8 @@ func TestLinuxDistros() error {
 	var errs error
 	for _, image := range images {
 		imgRef := fmt.Sprintf("images:%s", image)
-		if err := sh.RunV("./test/incus.sh", imgRef, "mage", "-v", "test"); err != nil {
+		if err := sh.RunV("./test/incus.sh", imgRef,
+			"mage", "-v", "test"); err != nil {
 			errs = errors.Join(errs, fmt.Errorf("image %s failed: %w", image, err))
 		}
 	}

@@ -1,1 +1,1 @@
-(?s).*local CA.*For CLI usage run.*source <\(locals env\).*✅ locals DNS started on 127.1.2.3 \(PID: [0-9]+\).*
+(?s).*(?:local CA|root certificate).*For CLI usage run.*source <\(locals env\).*✅ locals DNS started on 127.1.2.3 \(PID: [0-9]+\).*

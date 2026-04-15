@@ -11,10 +11,8 @@ const (
 	EnvLocalsConfigDir = "LOCALS_CONFIG_DIR"
 )
 
-type EnvFunc func(string) string
-
-func (e EnvFunc) SystemCA() string {
-	systemCA := e(EnvSystemCA)
+func SystemCA(p Platform) string {
+	systemCA := p.Env(EnvSystemCA)
 	if systemCA != "" {
 		return systemCA
 	}

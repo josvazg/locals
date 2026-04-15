@@ -126,6 +126,7 @@ func testAdds(ctx context.Context, t *testing.T, servers []*httptest.Server) {
 func testServers(ctx context.Context, t *testing.T, servers []*httptest.Server) {
 	t.Helper()
 	client := testClient(ctx, t)
+	defer client.CloseIdleConnections()
 	for _, server := range servers {
 		endpoint := server.Listener.Addr().String()
 		url := fmt.Sprintf("https://%s", serviceURL(portFrom(endpoint)))
