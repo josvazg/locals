@@ -14,6 +14,7 @@ type Proc interface {
 	Run(cmd string, args ...string) (string, error)
 	Launch(cmd string, args ...string) (int, error)
 	IsProcessAlive(pid int) bool
+	LookPath(file string) (string, error)
 }
 
 type osProc struct{}
@@ -28,6 +29,10 @@ func (_ *osProc) Launch(cmd string, args ...string) (int, error) {
 
 func (_ *osProc) IsProcessAlive(pid int) bool {
 	return isProcessAlive(pid)
+}
+
+func (_ *osProc) LookPath(file string) (string, error) {
+	return exec.LookPath(file)
 }
 
 func run(cmd string, args ...string) (string, error) {

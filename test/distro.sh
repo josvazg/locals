@@ -5,9 +5,13 @@ set -euo pipefail
 if command -v dnf >/dev/null; then
 	dnf install -y --skip-unavailable nix
 elif command -v apt-get >/dev/null; then
-    apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y nix
+	apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y nix
 elif command -v pacman >/dev/null; then
-    pacman -Syu --noconfirm nix
+	pacman -Syu --noconfirm nix
+elif command -v xbps-install >/dev/null; then
+	xbps-install -Sy git nix
+	ln -s /etc/sv/nix-daemon /var/service/
+	git config --global --add safe.directory /src
 elif command -v nix-env >/dev/null; then
 	nix-channel --add https://nixos.org/channels/nixpkgs-unstable nixpkgs
     	nix-channel --update

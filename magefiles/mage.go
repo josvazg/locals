@@ -34,9 +34,14 @@ func Shellcheck() error {
 	})...)
 }
 
+// GoVulnCheck runs govulncheck
+func GoVulnCheck() error {
+	return sh.RunV("go", "run", "golang.org/x/vuln/cmd/govulncheck@latest", "./...")
+}
+
 // Test runs all unit tests in the project.
 func Test() error {
-	mg.Deps(Build, Shellcheck)
+	mg.Deps(Shellcheck, GoVulnCheck, Build)
 
 	fmt.Println("Running tests...")
 	cwd, err := os.Getwd()
@@ -64,6 +69,7 @@ func TestLinuxDistros() error {
 		"ubuntu/25.04",
 		"fedora/43",
 		"nixos/25.11",
+		"voidlinux",
 	}
 	var errs error
 	for _, image := range images {
@@ -83,6 +89,22 @@ func TestLinuxDistros() error {
 func Clean() error {
 	fmt.Println("Cleaning up...")
 	return sh.Rm("bin")
+}
+
+// Record runs a recording test
+func Record() error {
+	mg.Deps(Build)
+
+	cwd, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("failed to get current working dir")
+	}
+	localsBinPath := filepath.Join(cwd, "bin")
+	env := map[string]string{
+		"RECORDING_TEST": "true",
+		"LOCALSBINPATH":     localsBinPath,
+	}
+	return runVEnv(env, "go", "test", "./internal/sim/record_test.go")
 }
 
 func runVEnv(env map[string]string, cmd string, args ...string) error {

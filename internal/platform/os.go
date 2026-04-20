@@ -26,7 +26,6 @@ type Platform interface {
 	HomeDir() (string, error)
 	IO() FilesHandler
 	Proc() Proc
-	Run(name string, args ...string) (string, error)
 	CheckDNSSetup(configDir string) *DNSStatus
 }
 
