@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/fs"
 	"locals/internal/platform"
@@ -53,7 +54,10 @@ func (rec *recorderPlatform) Clear() error {
 	}
 
 	file := filepath.Join(dir, "session.jsonl")
-	return os.Truncate(file, 0)
+	if err := os.Truncate(file, 0); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("failed to clear previous recoded session: %w", err)
+	}
+	return nil
 }
 
 // Record handles the serialization and persistence.
