@@ -93,7 +93,7 @@ func localsBinary(p platform.Platform, binary string) (string, error) {
 		log.Printf("render binary: %q", binary)
 		return binary, nil
 	}
-	binPath, err := p.Proc().Run("command", "-v", "locals")
+	binPath, err := p.Proc().LookPath("locals")
 	if err != nil {
 		return "", fmt.Errorf("failed to find locals binary path: %w", err)
 	}
