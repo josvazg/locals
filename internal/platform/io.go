@@ -3,6 +3,7 @@ package platform
 import (
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"log"
 	"os"
@@ -12,6 +13,7 @@ import (
 
 type FilesHandler interface {
 	ReadFile(filename string) ([]byte, error)
+	AppendTo(filename string) (io.WriteCloser, error)
 	ReadDir(dirname string) ([]fs.DirEntry, error)
 	CreateFile(filename, content string) error
 	CreateDir(filename string) error
@@ -30,6 +32,10 @@ func newOSFilesHandler() *osFilesHandler {
 func (osf *osFilesHandler) ReadFile(filename string) ([]byte, error) {
 	return os.ReadFile(filename)
 }
+
+func (osf *osFilesHandler) AppendTo(filename string) (io.WriteCloser, error) {
+	return os.OpenFile(filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+} 
 
 func (osf *osFilesHandler) CreateFile(filename, content string) error {
 	dir := filepath.Dir(filename)

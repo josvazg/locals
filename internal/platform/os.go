@@ -17,6 +17,8 @@ const (
 // Platform defines everything the tool needs from the operating system.
 // Swap these out to run the app in tests or with recorded behavior.
 type Platform interface {
+	SetStdout(stdout io.Writer)
+	SetStderr(stderr io.Writer)
 	Stdout() io.Writer
 	Stderr() io.Writer
 	Stdin() io.Reader
@@ -29,14 +31,24 @@ type Platform interface {
 }
 
 type osPlatform struct {
+	stdout io.Writer
+	stderr io.Writer
 }
 
-func (_ *osPlatform) Stdout() io.Writer {
-	return os.Stdout
+func (osp *osPlatform) SetStdout(stdout io.Writer) {
+	osp.stdout = stdout
 }
 
-func (_ *osPlatform) Stderr() io.Writer {
-	return os.Stderr
+func (osp *osPlatform) SetStderr(stderr io.Writer) {
+	osp.stderr = stderr
+}
+
+func (osp *osPlatform) Stdout() io.Writer {
+	return osp.stdout
+}
+
+func (osp *osPlatform) Stderr() io.Writer {
+	return osp.stderr
 }
 
 func (_ *osPlatform) Stdin() io.Reader {
@@ -69,5 +81,5 @@ func (p *osPlatform) CheckDNSSetup(configDir string) *DNSStatus {
 
 // NewOSPlatform returns a platform implementation backed by the real OS.
 func NewOSPlatform() Platform {
-	return &osPlatform{}
+	return &osPlatform{stdout: os.Stdout, stderr: os.Stderr}
 }
