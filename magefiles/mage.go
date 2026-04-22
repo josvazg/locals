@@ -66,7 +66,7 @@ func TestLinuxDistros() error {
 	images := []string{
 		"archlinux",
 		"debian/14",
-		"ubuntu/25.10",
+		"ubuntu/24.04",
 		"fedora/43",
 		"nixos/25.11",
 		"voidlinux",
