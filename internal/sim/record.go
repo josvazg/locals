@@ -287,7 +287,7 @@ func GetVersion(p platform.Platform) string {
 		if err != nil {
 			return "linux-generic"
 		}
-		versionID := parseOSRelease(data, "VERSION_ID")
+		versionID := parseOSRelease(data, "VERSION_ID", "VERSION_CODENAME")
 		if versionID == "" {
 			kv, _ := p.Proc().Run("uname", "-r")
 			return strings.TrimSpace(kv)
@@ -301,13 +301,15 @@ func GetVersion(p platform.Platform) string {
 
 // Helpers to keep the logic clean
 
-func parseOSRelease(data []byte, key string) string {
+func parseOSRelease(data []byte, keys ...string) string {
 	scanner := bufio.NewScanner(bytes.NewReader(data))
 	for scanner.Scan() {
 		line := scanner.Text()
-		if strings.HasPrefix(line, key+"=") {
-			val := strings.TrimPrefix(line, key+"=")
-			return strings.Trim(val, `"'`)
+		for _, key := range keys {
+			if strings.HasPrefix(line, key+"=") {
+				val := strings.TrimPrefix(line, key+"=")
+				return strings.Trim(val, `"'`)
+			}
 		}
 	}
 	return ""
