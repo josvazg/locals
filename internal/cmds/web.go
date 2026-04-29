@@ -188,7 +188,7 @@ func loadConfig(p platform.Platform, store ProxyStore, webDir string) error {
 	hosts := map[string]struct{}{}
 	ensureProbeCert(store, hosts)
 	for _, f := range files {
-		data, err := p.IO().ReadFile(f)
+		data, err := p.FS().ReadFile(f)
 		if err != nil {
 			return fmt.Errorf("read web config %s: %w", f, err)
 		}

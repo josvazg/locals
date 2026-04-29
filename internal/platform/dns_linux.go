@@ -6,7 +6,7 @@ import (
 	"fmt"
 )
 
-func checkDNSSetup(io FilesHandler, configDir string) *DNSStatus {
+func checkDNSSetup(io Filesystem, configDir string) *DNSStatus {
 	dnsMode := "INACTIVE"
 	active := false
 	found, err := Find(io, "/proc/self/mountinfo", DNSConfigFile(configDir))

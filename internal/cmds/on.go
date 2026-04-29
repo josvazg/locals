@@ -89,7 +89,7 @@ func on(p platform.Platform, binary, localsDir string, dryrun bool) error {
 
 func localsBinary(p platform.Platform, binary string) (string, error) {
 	log.Printf("evaluating locals path: binary=%q", binary)
-	if p.IO().PathExists(binary) {
+	if p.FS().PathExists(binary) {
 		log.Printf("render binary: %q", binary)
 		return binary, nil
 	}
@@ -119,7 +119,7 @@ func launchDNS(p platform.Platform, cfg *Config) error {
 			return nil
 		}
 		fmt.Println("🔄 Cleaning up stale PID file from previous crash...")
-		if err := p.IO().RemoveFiles(pidFile); err != nil {
+		if err := p.FS().RemoveFiles(pidFile); err != nil {
 			return fmt.Errorf("failed to remove PID file %q: %w", pidFile, err)
 		}
 	}
@@ -131,11 +131,11 @@ func launchDNS(p platform.Platform, cfg *Config) error {
 	pid, err := p.Proc().Launch("sudo", "env", fmt.Sprintf("PATH=%s", p.Env("PATH")),
 		"nohup", cfg.LocalsBin,
 		"dns", cfg.DNSListen, fallbacks,
-		"--log", filepath.Join(p.IO().TempDir(), "locals-dns.log"))
+		"--log", filepath.Join(p.FS().TempDir(), "locals-dns.log"))
 	if err != nil {
 		return fmt.Errorf("failed to launch embedded DNS server: %w", err)
 	}
-	if err := p.IO().CreateFile(pidFile, fmt.Sprintf("%d", pid)); err != nil {
+	if err := p.FS().CreateFile(pidFile, fmt.Sprintf("%d", pid)); err != nil {
 		return fmt.Errorf("failed to write the embedded DNS server PID file: %w", err)
 	}
 	log.Printf("✅ locals DNS started on %s (PID: %d)", cfg.DNSListen, pid)
@@ -143,7 +143,7 @@ func launchDNS(p platform.Platform, cfg *Config) error {
 }
 
 func currentDNSServers(p platform.Platform) ([]string, error) {
-	resolvConfCfg, err := p.IO().ReadFile("/etc/resolv.conf")
+	resolvConfCfg, err := p.FS().ReadFile("/etc/resolv.conf")
 	if err != nil {
 		return nil, fmt.Errorf("failed to read /etc/resolv.conf: %w", err)
 	}
@@ -171,7 +171,7 @@ func isUsingSystemdResolved(p platform.Platform) bool {
 		"/usr/lib/systemd/system/systemd-resolved.service",
 	}
 	for _, path := range paths {
-		if p.IO().PathExists(path) {
+		if p.FS().PathExists(path) {
 			return true
 		}
 	}
@@ -186,18 +186,18 @@ func launchWeb(p platform.Platform, cfg *Config) error {
 			return nil
 		}
 		fmt.Println("🔄 Cleaning up stale PID file from previous crash...")
-		if err := p.IO().RemoveFiles(pidFile); err != nil {
+		if err := p.FS().RemoveFiles(pidFile); err != nil {
 			return fmt.Errorf("failed to remove PID file %q: %w", pidFile, err)
 		}
 	}
 	webCfg := filepath.Join(cfg.LocalsDir, "web")
 	pid, err := p.Proc().Launch("sudo", "env", fmt.Sprintf("PATH=%s", p.Env("PATH")),
 		"nohup", cfg.LocalsBin, "web",
-		webCfg, "--log", filepath.Join(p.IO().TempDir(), "locals-web.log"))
+		webCfg, "--log", filepath.Join(p.FS().TempDir(), "locals-web.log"))
 	if err != nil {
 		return fmt.Errorf("failed to launch embedded web server: %w", err)
 	}
-	if err := p.IO().CreateFile(pidFile, fmt.Sprintf("%d", pid)); err != nil {
+	if err := p.FS().CreateFile(pidFile, fmt.Sprintf("%d", pid)); err != nil {
 		return fmt.Errorf("failed to write the embedded web server PID file: %w", err)
 	}
 	log.Printf("✅ locals web started on %s (PID: %d)", cfg.DNSListen, pid)
@@ -205,7 +205,7 @@ func launchWeb(p platform.Platform, cfg *Config) error {
 }
 
 func readPIDFromFile(p platform.Platform, pidFile string) int {
-	data, err := p.IO().ReadFile(pidFile)
+	data, err := p.FS().ReadFile(pidFile)
 	if err != nil {
 		return -1
 	}
@@ -239,7 +239,7 @@ func probeDNS(p platform.Platform, dnsListen string) error {
 	d := net.Dialer{Timeout: 2 * time.Second}
 	conn, err := d.Dial("udp", completeAddress(dnsListen, 53))
 	if err != nil {
-		return fmt.Errorf("probe failed, check failure at %s/locals-dns.log: %w", p.IO().TempDir(), err)
+		return fmt.Errorf("probe failed, check failure at %s/locals-dns.log: %w", p.FS().TempDir(), err)
 	}
 	defer conn.Close()
 	return nil
@@ -251,12 +251,12 @@ func probeWeb(p platform.Platform, webListen string) error {
 	}
 	conf := &tls.Config{
 		InsecureSkipVerify: true,
-		ServerName: "probe",
+		ServerName:         "probe",
 	}
 	address := completeAddress(webListen, 443)
 	conn, err := tls.DialWithDialer(dialer, "tcp", address, conf)
 	if err != nil {
-		return fmt.Errorf("probe failed, check failure at %s/locals-web.log: %w", p.IO().TempDir(), err)
+		return fmt.Errorf("probe failed, check failure at %s/locals-web.log: %w", p.FS().TempDir(), err)
 	}
 	defer conn.Close()
 	return nil

@@ -44,7 +44,7 @@ func status(p platform.Platform, configDir string) error {
 	}
 
 	rulesDir := filepath.Join(configDir, "web")
-	files, _ := p.IO().ReadDir(rulesDir)
+	files, _ := p.FS().ReadDir(rulesDir)
 
 	count := 0
 	for _, f := range files {
@@ -52,7 +52,7 @@ func status(p platform.Platform, configDir string) error {
 			count++
 			name := strings.TrimSuffix(f.Name(), ".json")
 			target := "unknown"
-			if content, err := p.IO().ReadFile(filepath.Join(rulesDir, f.Name())); err == nil {
+			if content, err := p.FS().ReadFile(filepath.Join(rulesDir, f.Name())); err == nil {
 				webConfig := WebConfig{}
 				if err := json.Unmarshal(content, &webConfig); err == nil {
 					name = webConfig.URL
@@ -71,7 +71,7 @@ func status(p platform.Platform, configDir string) error {
 }
 
 func isProcessAlive(p platform.Platform, pidPath string) bool {
-	data, err := p.IO().ReadFile(pidPath)
+	data, err := p.FS().ReadFile(pidPath)
 	if err != nil {
 		return false
 	}

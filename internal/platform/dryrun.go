@@ -14,8 +14,8 @@ func NewDryrunPlatform(p Platform) Platform {
 	return &dryrunPlatform{p}
 }
 
-func (dp *dryrunPlatform) IO() FilesHandler {
-	return &dryrunIO{FilesHandler: dp.Platform.IO()}
+func (dp *dryrunPlatform) FS() Filesystem {
+	return &dryrunIO{Filesystem: dp.Platform.FS()}
 }
 
 func (dp *dryrunPlatform) Proc() Proc {
@@ -45,7 +45,7 @@ func dryrunLaunch(cmd string, args ...string) (int, error) {
 }
 
 type dryrunIO struct {
-	FilesHandler
+	Filesystem
 }
 
 func (dio *dryrunIO) CreateFile(filename, content string) error {

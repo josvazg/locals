@@ -14,22 +14,6 @@ const (
 	DefaultDNSListen = "127.1.2.3"
 )
 
-// Platform defines everything the tool needs from the operating system.
-// Swap these out to run the app in tests or with recorded behavior.
-type Platform interface {
-	SetStdout(stdout io.Writer)
-	SetStderr(stderr io.Writer)
-	Stdout() io.Writer
-	Stderr() io.Writer
-	Stdin() io.Reader
-	Env(name string) string
-	HomeDir() (string, error)
-	IO() FilesHandler
-	Proc() Proc
-	Run(name string, args ...string) (string, error)
-	CheckDNSSetup(configDir string) *DNSStatus
-}
-
 type osPlatform struct {
 	stdout io.Writer
 	stderr io.Writer
@@ -63,8 +47,8 @@ func (_ *osPlatform) HomeDir() (string, error) {
 	return os.UserHomeDir()
 }
 
-func (_ *osPlatform) IO() FilesHandler {
-	return newOSFilesHandler()
+func (_ *osPlatform) FS() Filesystem {
+	return newOSFilesystem()
 }
 
 func (_ *osPlatform) Proc() Proc {
@@ -76,7 +60,7 @@ func (_ *osPlatform) Run(cmd string, args ...string) (string, error) {
 }
 
 func (p *osPlatform) CheckDNSSetup(configDir string) *DNSStatus {
-	return checkDNSSetup(p.IO(), configDir)
+	return checkDNSSetup(p.FS(), configDir)
 }
 
 // NewOSPlatform returns a platform implementation backed by the real OS.

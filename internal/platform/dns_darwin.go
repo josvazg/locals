@@ -2,7 +2,7 @@
 
 package platform
 
-func checkDNSSetup(io FilesHandler, _ string) *DNSStatus {
+func checkDNSSetup(io Filesystem, _ string) *DNSStatus {
 	dnsMode := ""
 	dnsConfig, err := io.ReadFile("/etc/resolver/locals")
 	hasFile := err == nil && len(dnsConfig) > 0

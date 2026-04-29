@@ -18,8 +18,8 @@ func configureDNS(p platform.Platform, cfg *Config) error {
 		}
 	}
 	resolverCfg := fmt.Sprintf("nameserver %s\nport 53\n", cfg.DNSListen)
-	tmpLocalsResolverFile := filepath.Join(p.IO().TempDir(), "locals-resolver.conf")
-	if err := p.IO().CreateFile(tmpLocalsResolverFile, resolverCfg); err != nil {
+	tmpLocalsResolverFile := filepath.Join(p.FS().TempDir(), "locals-resolver.conf")
+	if err := p.FS().CreateFile(tmpLocalsResolverFile, resolverCfg); err != nil {
 		return fmt.Errorf("failed to write resolver config: %w", err)
 	}
 	if _, err := p.Proc().Run("sudo", "cp", tmpLocalsResolverFile, resolverMacLocalsFile); err != nil {

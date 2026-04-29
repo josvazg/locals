@@ -7,7 +7,7 @@ import (
 )
 
 func setupLog(p platform.Platform, logFile string) error {
-	f, err := p.IO().AppendTo(logFile)
+	f, err := p.FS().AppendTo(logFile)
 	if err != nil {
 		return fmt.Errorf("failed to open log file: %w", err)
 	}

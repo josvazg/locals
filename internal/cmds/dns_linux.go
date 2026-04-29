@@ -12,7 +12,7 @@ func configureDNS(p platform.Platform, cfg *Config) error {
 	// use our replacement file as /etc/resolv.conf coul be a symlink,
 	// or mounted elsewhere
 	resolvConfLocal := platform.DNSConfigFile(cfg.LocalsDir)
-	resolvConfMounted, err := platform.Find(p.IO(), "/proc/self/mountinfo", resolvConfLocal)
+	resolvConfMounted, err := platform.Find(p.FS(), "/proc/self/mountinfo", resolvConfLocal)
 	if err != nil {
 		return fmt.Errorf("failed to check for mountinfo: %w", err)
 	}
@@ -21,7 +21,7 @@ func configureDNS(p platform.Platform, cfg *Config) error {
 		return nil
 	}
 	resolvCfg := fmt.Sprintf("nameserver %s\noptions edns0 trust-ad", cfg.DNSListen)
-	if err := p.IO().CreateFile(resolvConfLocal, resolvCfg); err != nil {
+	if err := p.FS().CreateFile(resolvConfLocal, resolvCfg); err != nil {
 		return fmt.Errorf("failed to create alternate resolv.conf: %w", err)
 	}
 	if _, err := p.Proc().Run("sudo", "mount", "--bind", resolvConfLocal, "/etc/resolv.conf"); err != nil {
@@ -33,7 +33,7 @@ func configureDNS(p platform.Platform, cfg *Config) error {
 
 func unconfigureDNS(p platform.Platform, cfg *Config) error {
 	resolvConfLocal := platform.DNSConfigFile(cfg.LocalsDir)
-	resolvConfMounted, err := platform.Find(p.IO(), "/proc/self/mountinfo", resolvConfLocal)
+	resolvConfMounted, err := platform.Find(p.FS(), "/proc/self/mountinfo", resolvConfLocal)
 	if err != nil {
 		return fmt.Errorf("failed to check for mountinfo: %w", err)
 	}
@@ -44,7 +44,7 @@ func unconfigureDNS(p platform.Platform, cfg *Config) error {
 	} else {
 		log.Printf("ℹ️ /etc/resolv.conf was not mounted.")
 	}
-	if err := p.IO().RemoveFiles(resolverConf); err != nil {
+	if err := p.FS().RemoveFiles(resolverConf); err != nil {
 		return fmt.Errorf("failed to remove resolved config: %w", err)
 	}
 	return nil

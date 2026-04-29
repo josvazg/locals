@@ -126,7 +126,7 @@ func fallbacks(p platform.Platform, args []string, listen string) ([]string, err
 }
 
 func nameservers(p platform.Platform, path string) ([]string, error) {
-	contents, err := p.IO().ReadFile(path)
+	contents, err := p.FS().ReadFile(path)
 	if err != nil {
 		return nil, err
 	}

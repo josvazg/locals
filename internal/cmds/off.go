@@ -54,19 +54,19 @@ func off(p platform.Platform, localsDir string, wipe, dryrun bool) error {
 		return fmt.Errorf("failed to %sdisable mkcert: %w", qual, err)
 	}
 	if wipe {
-		serviceFiles, err := p.IO().ListFiles(filepath.Join(localsDir, "web", "*.json"))
+		serviceFiles, err := p.FS().ListFiles(filepath.Join(localsDir, "web", "*.json"))
 		if err != nil {
 			return fmt.Errorf("failed to list cert files: %w", err)
 		}
-		if err := p.IO().RemoveFiles(serviceFiles...); err != nil {
+		if err := p.FS().RemoveFiles(serviceFiles...); err != nil {
 			return fmt.Errorf("failed to %swipe endpoint configs: %w", qual, err)
 		}
 		log.Printf("Wiped %d service files", len(serviceFiles))
-		certFiles, err := p.IO().ListFiles(filepath.Join(localsDir, "certs", "*.pem"))
+		certFiles, err := p.FS().ListFiles(filepath.Join(localsDir, "certs", "*.pem"))
 		if err != nil {
 			return fmt.Errorf("failed to list cert files: %w", err)
 		}
-		if err := p.IO().RemoveFiles(certFiles...); err != nil {
+		if err := p.FS().RemoveFiles(certFiles...); err != nil {
 			return fmt.Errorf("failed to %swipe service certificates: %w", qual, err)
 		}
 		log.Printf("Wiped %d cert files", len(certFiles))

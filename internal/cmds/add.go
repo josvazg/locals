@@ -54,7 +54,7 @@ func add(p platform.Platform, localsDir, domain, targetURL string) error {
 	log.Print(out)
 	domainCfgFile := filepath.Join(localsDir, "web", fmt.Sprintf("%s.json", domain))
 	domainCfgJSON := fmt.Sprintf(domainConfig, domain, targetURL, certFile, keyFile)
-	if err := p.IO().CreateFile(domainCfgFile, domainCfgJSON); err != nil {
+	if err := p.FS().CreateFile(domainCfgFile, domainCfgJSON); err != nil {
 		return fmt.Errorf("failed to setup web redirection for domain %s: %w", domain, err)
 	}
 	log.Printf("▶️ Added access to %s -> %s", domain, targetURL)

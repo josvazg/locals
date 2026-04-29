@@ -62,7 +62,7 @@ func initFileSystem(p platform.Platform, cfgDir string) error {
 
 	for _, d := range dirs {
 		path := filepath.Join(cfgDir, d)
-		if err := p.IO().CreateDir(path); err != nil {
+		if err := p.FS().CreateDir(path); err != nil {
 			return fmt.Errorf("failed to create config subdir: %w", err)
 		}
 	}
