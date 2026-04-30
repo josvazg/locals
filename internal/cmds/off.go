@@ -2,6 +2,8 @@ package cmds
 
 import (
 	"fmt"
+	"locals/internal/cfg"
+	"locals/internal/dnsctl"
 	"locals/internal/platform"
 	"log"
 	"path/filepath"
@@ -23,7 +25,11 @@ func offCmd(p platform.Platform, localsDir string) *cobra.Command {
 				log.Printf("DRYRUN")
 				p = platform.NewDryrunPlatform(p)
 			}
-			return off(p, localsDir, wipe, dryrun)
+			config, err := newConfig(p, "", localsDir)
+			if err != nil {
+				return fmt.Errorf("failed to setup off config: %w", err)
+			}
+			return off(p, config, wipe, dryrun)
 		},
 	}
 	cmd.Flags().BoolVarP(&dryrun, "dryrun", "", false, "show what start would have done")
@@ -31,30 +37,25 @@ func offCmd(p platform.Platform, localsDir string) *cobra.Command {
 	return cmd
 }
 
-func off(p platform.Platform, localsDir string, wipe, dryrun bool) error {
-	cfg := Config{
-		DNSListen: platform.DefaultDNSListen,
-		LocalsDir: localsDir,
-		SystemCA:  platform.SystemCA(p),
-	}
+func off(p platform.Platform, config *cfg.Config, wipe, dryrun bool) error {
 	qual := ""
 	if dryrun {
 		qual = "dryrun "
 	}
-	if err := unconfigureDNS(p, &cfg); err != nil {
+	if err := dnsctl.NewDNSController(p, config).Release(); err != nil {
 		return fmt.Errorf("failed to %sunconfigure DNS config: %w", qual, err)
 	}
-	if err := stopService(p, "dns", &cfg); err != nil {
+	if err := stopService(p, "dns", config); err != nil {
 		return fmt.Errorf("failed to %sstop embedded DNS server: %w", qual, err)
 	}
-	if err := stopService(p, "web", &cfg); err != nil {
+	if err := stopService(p, "web", config); err != nil {
 		return fmt.Errorf("failed to %sstop embedded web server: %w", qual, err)
 	}
 	if err := uninstallMkcert(p); err != nil {
 		return fmt.Errorf("failed to %sdisable mkcert: %w", qual, err)
 	}
 	if wipe {
-		serviceFiles, err := p.FS().ListFiles(filepath.Join(localsDir, "web", "*.json"))
+		serviceFiles, err := p.FS().ListFiles(filepath.Join(config.LocalsDir, "web", "*.json"))
 		if err != nil {
 			return fmt.Errorf("failed to list cert files: %w", err)
 		}
@@ -62,7 +63,7 @@ func off(p platform.Platform, localsDir string, wipe, dryrun bool) error {
 			return fmt.Errorf("failed to %swipe endpoint configs: %w", qual, err)
 		}
 		log.Printf("Wiped %d service files", len(serviceFiles))
-		certFiles, err := p.FS().ListFiles(filepath.Join(localsDir, "certs", "*.pem"))
+		certFiles, err := p.FS().ListFiles(filepath.Join(config.LocalsDir, "certs", "*.pem"))
 		if err != nil {
 			return fmt.Errorf("failed to list cert files: %w", err)
 		}
@@ -74,8 +75,8 @@ func off(p platform.Platform, localsDir string, wipe, dryrun bool) error {
 	return nil
 }
 
-func stopService(p platform.Platform, service string, cfg *Config) error {
-	pidFile := filepath.Join(cfg.LocalsDir, fmt.Sprintf("%s.pid", service))
+func stopService(p platform.Platform, service string, config *cfg.Config) error {
+	pidFile := filepath.Join(config.LocalsDir, fmt.Sprintf("%s.pid", service))
 	pid := readPIDFromFile(p, pidFile)
 	if pid < 0 {
 		log.Printf("ℹ️ No %s PID file found. Nothing to kill.", service)

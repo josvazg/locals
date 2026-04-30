@@ -6,6 +6,8 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"locals/internal/cfg"
+	"locals/internal/dnsctl"
 	"locals/internal/platform"
 	"log"
 	"net"
@@ -21,20 +23,7 @@ const (
 	probeRetries = 5
 
 	probePause = 1 * time.Second
-
-	resolverMacConfigDir = "/etc/resolver"
-
-	resolverMacLocalsFile = "/etc/resolver/locals"
-
-	resolverConf = "/etc/systemd/resolved.conf.d/locals.conf"
 )
-
-type Config struct {
-	DNSListen string
-	LocalsDir string
-	SystemCA  string
-	LocalsBin string
-}
 
 func onCmd(p platform.Platform, localsDir, binary string) *cobra.Command {
 	var dryrun bool
@@ -47,24 +36,36 @@ func onCmd(p platform.Platform, localsDir, binary string) *cobra.Command {
 				log.Printf("DRYRUN")
 				p = platform.NewDryrunPlatform(p)
 			}
-			return on(p, binary, localsDir, dryrun)
+			config, err := newConfig(p, binary, localsDir)
+			if err != nil {
+				return fmt.Errorf("failed to setup on config: %w", err)
+			}
+			return on(p, config, dryrun)
 		},
 	}
 	cmd.Flags().BoolVarP(&dryrun, "dryrun", "", false, "show what start would have done")
 	return cmd
 }
 
-func on(p platform.Platform, binary, localsDir string, dryrun bool) error {
-	localsBin, err := localsBinary(p, binary)
-	if err != nil {
-		return fmt.Errorf("failed to resolve path to locals: %w", err)
+func newConfig(p platform.Platform, binary string, localsDir string) (*cfg.Config, error) {
+	localsBin := ""
+	if binary != "" {
+		bin, err := localsBinary(p, binary)
+		if err != nil {
+			return nil, fmt.Errorf("failed to resolve path to locals: %w", err)
+		}
+		localsBin = bin
 	}
-	state := Config{
+	config := cfg.Config{
 		DNSListen: platform.DefaultDNSListen,
 		LocalsDir: localsDir,
 		LocalsBin: localsBin,
 		SystemCA:  platform.SystemCA(p),
 	}
+	return &config, nil
+}
+
+func on(p platform.Platform, config *cfg.Config, dryrun bool) error {
 	qual := ""
 	if dryrun {
 		qual = "dryrun "
@@ -72,19 +73,19 @@ func on(p platform.Platform, binary, localsDir string, dryrun bool) error {
 	if err := installMkcert(p); err != nil {
 		return fmt.Errorf("failed to %sinstall mkcert: %w", qual, err)
 	}
-	if err := launchDNS(p, &state); err != nil {
+	if err := launchDNS(p, config); err != nil {
 		return fmt.Errorf("failed to %slaunch embedded DNS server: %w", qual, err)
 	}
-	if err := configureDNS(p, &state); err != nil {
+	if err := dnsctl.NewDNSController(p, config).Grab(); err != nil {
 		return fmt.Errorf("failed to %sconfigure system DNS: %w", qual, err)
 	}
-	if err := launchWeb(p, &state); err != nil {
+	if err := launchWeb(p, config); err != nil {
 		return fmt.Errorf("failed to %slaunch embedded Web server: %w", qual, err)
 	}
 	if dryrun {
 		return nil
 	}
-	return probeServices(p, state.DNSListen, ListenAddr)
+	return probeServices(p, config.DNSListen, ListenAddr)
 }
 
 func localsBinary(p platform.Platform, binary string) (string, error) {
@@ -111,8 +112,8 @@ func installMkcert(p platform.Platform) error {
 	return nil
 }
 
-func launchDNS(p platform.Platform, cfg *Config) error {
-	pidFile := filepath.Join(cfg.LocalsDir, "dns.pid")
+func launchDNS(p platform.Platform, config *cfg.Config) error {
+	pidFile := filepath.Join(config.LocalsDir, "dns.pid")
 	if pid := readPIDFromFile(p, pidFile); pid >= 0 {
 		if p.Proc().IsProcessAlive(pid) {
 			fmt.Printf("⚠️ locals dns is already running (PID: %d). Skipping start.\n", pid)
@@ -129,8 +130,8 @@ func launchDNS(p platform.Platform, cfg *Config) error {
 	}
 	fallbacks := strings.Join(dnsServers, ",")
 	pid, err := p.Proc().Launch("sudo", "env", fmt.Sprintf("PATH=%s", p.Env("PATH")),
-		"nohup", cfg.LocalsBin,
-		"dns", cfg.DNSListen, fallbacks,
+		"nohup", config.LocalsBin,
+		"dns", config.DNSListen, fallbacks,
 		"--log", filepath.Join(p.FS().TempDir(), "locals-dns.log"))
 	if err != nil {
 		return fmt.Errorf("failed to launch embedded DNS server: %w", err)
@@ -138,7 +139,7 @@ func launchDNS(p platform.Platform, cfg *Config) error {
 	if err := p.FS().CreateFile(pidFile, fmt.Sprintf("%d", pid)); err != nil {
 		return fmt.Errorf("failed to write the embedded DNS server PID file: %w", err)
 	}
-	log.Printf("✅ locals DNS started on %s (PID: %d)", cfg.DNSListen, pid)
+	log.Printf("✅ locals DNS started on %s (PID: %d)", config.DNSListen, pid)
 	return nil
 }
 
@@ -178,8 +179,8 @@ func isUsingSystemdResolved(p platform.Platform) bool {
 	return false
 }
 
-func launchWeb(p platform.Platform, cfg *Config) error {
-	pidFile := filepath.Join(cfg.LocalsDir, "web.pid")
+func launchWeb(p platform.Platform, config *cfg.Config) error {
+	pidFile := filepath.Join(config.LocalsDir, "web.pid")
 	if pid := readPIDFromFile(p, pidFile); pid >= 0 {
 		if p.Proc().IsProcessAlive(pid) {
 			fmt.Printf("⚠️ locals web is already running (PID: %d). Skipping start.\n", pid)
@@ -190,9 +191,9 @@ func launchWeb(p platform.Platform, cfg *Config) error {
 			return fmt.Errorf("failed to remove PID file %q: %w", pidFile, err)
 		}
 	}
-	webCfg := filepath.Join(cfg.LocalsDir, "web")
+	webCfg := filepath.Join(config.LocalsDir, "web")
 	pid, err := p.Proc().Launch("sudo", "env", fmt.Sprintf("PATH=%s", p.Env("PATH")),
-		"nohup", cfg.LocalsBin, "web",
+		"nohup", config.LocalsBin, "web",
 		webCfg, "--log", filepath.Join(p.FS().TempDir(), "locals-web.log"))
 	if err != nil {
 		return fmt.Errorf("failed to launch embedded web server: %w", err)
@@ -200,7 +201,7 @@ func launchWeb(p platform.Platform, cfg *Config) error {
 	if err := p.FS().CreateFile(pidFile, fmt.Sprintf("%d", pid)); err != nil {
 		return fmt.Errorf("failed to write the embedded web server PID file: %w", err)
 	}
-	log.Printf("✅ locals web started on %s (PID: %d)", cfg.DNSListen, pid)
+	log.Printf("✅ locals web started on %s (PID: %d)", config.DNSListen, pid)
 	return nil
 }
 
