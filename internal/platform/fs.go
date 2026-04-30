@@ -3,7 +3,6 @@ package platform
 import (
 	"errors"
 	"fmt"
-	"io"
 	"io/fs"
 	"log"
 	"os"
@@ -13,7 +12,6 @@ import (
 
 type Filesystem interface {
 	ReadFile(filename string) ([]byte, error)
-	AppendTo(filename string) (io.WriteCloser, error)
 	ReadDir(dirname string) ([]fs.DirEntry, error)
 	CreateFile(filename, content string) error
 	CreateDir(filename string) error
@@ -31,10 +29,6 @@ func newOSFilesystem() *osFilesystem {
 
 func (osf *osFilesystem) ReadFile(filename string) ([]byte, error) {
 	return os.ReadFile(filename)
-}
-
-func (osf *osFilesystem) AppendTo(filename string) (io.WriteCloser, error) {
-	return os.OpenFile(filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 }
 
 func (osf *osFilesystem) CreateFile(filename, content string) error {

@@ -8,8 +8,6 @@ import (
 // Platform defines everything the tool needs from the operating system.
 // Swap these out to run the app in tests or with recorded behavior.
 type Platform interface {
-	SetStdout(stdout io.Writer)
-	SetStderr(stderr io.Writer)
 	Stdout() io.Writer
 	Stderr() io.Writer
 	Stdin() io.Reader
@@ -17,7 +15,6 @@ type Platform interface {
 	HomeDir() (string, error)
 	FS() Filesystem
 	Proc() Proc
-	Run(name string, args ...string) (string, error)
 	CheckDNSSetup(configDir string) *DNSStatus
 }
 

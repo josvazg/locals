@@ -19,14 +19,6 @@ type osPlatform struct {
 	stderr io.Writer
 }
 
-func (osp *osPlatform) SetStdout(stdout io.Writer) {
-	osp.stdout = stdout
-}
-
-func (osp *osPlatform) SetStderr(stderr io.Writer) {
-	osp.stderr = stderr
-}
-
 func (osp *osPlatform) Stdout() io.Writer {
 	return osp.stdout
 }
@@ -53,10 +45,6 @@ func (_ *osPlatform) FS() Filesystem {
 
 func (_ *osPlatform) Proc() Proc {
 	return &osProc{}
-}
-
-func (_ *osPlatform) Run(cmd string, args ...string) (string, error) {
-	return run(cmd, args...)
 }
 
 func (p *osPlatform) CheckDNSSetup(configDir string) *DNSStatus {
