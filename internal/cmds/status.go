@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"locals/internal/platform"
+	"locals/internal/web"
 
 	"github.com/spf13/cobra"
 )
@@ -53,7 +54,7 @@ func status(p platform.Platform, configDir string) error {
 			name := strings.TrimSuffix(f.Name(), ".json")
 			target := "unknown"
 			if content, err := p.FS().ReadFile(filepath.Join(rulesDir, f.Name())); err == nil {
-				webConfig := WebConfig{}
+				webConfig := web.Config{}
 				if err := json.Unmarshal(content, &webConfig); err == nil {
 					name = webConfig.URL
 					target = webConfig.Endpoint

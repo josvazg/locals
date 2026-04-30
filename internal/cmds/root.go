@@ -36,8 +36,8 @@ func Run(ctx context.Context, p platform.Platform, args []string) error {
 		offCmd(p, cfgDir),
 		addCmd(p, cfgDir),
 		rmCmd(p, cfgDir),
-		dnsCmd(ctx, p),
-		webCmd(ctx, p, cfgDir),
+		dnsCmd(ctx),
+		webCmd(ctx, cfgDir),
 		statusCmd(p, cfgDir),
 		envCmd(),
 	)
