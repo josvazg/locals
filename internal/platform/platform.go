@@ -14,7 +14,7 @@ type Platform interface {
 	Env(name string) string
 	HomeDir() (string, error)
 	FS() Filesystem
-	Proc() Proc
+	Run(cmd string, args ...string) (string, error)
 	CheckDNSSetup(configDir string) *DNSStatus
 }
 

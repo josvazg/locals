@@ -28,7 +28,7 @@ func (d *osDNSController) Grab() error {
 	if err := d.p.FS().CreateFile(resolvConfLocal, resolvCfg); err != nil {
 		return fmt.Errorf("failed to create alternate resolv.conf: %w", err)
 	}
-	if _, err := d.p.Proc().Run("sudo", "mount", "--bind", resolvConfLocal, "/etc/resolv.conf"); err != nil {
+	if _, err := d.p.Run("sudo", "mount", "--bind", resolvConfLocal, "/etc/resolv.conf"); err != nil {
 		return fmt.Errorf("failed to bind mount /etc/resolv.conf: %w", err)
 	}
 	log.Printf("🔒 /etc/resolv.conf mounted to redirect DNS queries to locals dns first")
@@ -42,7 +42,7 @@ func (d *osDNSController) Release() error {
 		return fmt.Errorf("failed to check for mountinfo: %w", err)
 	}
 	if resolvConfMounted {
-		if _, err := d.p.Proc().Run("sudo", "umount", "/etc/resolv.conf"); err != nil {
+		if _, err := d.p.Run("sudo", "umount", "/etc/resolv.conf"); err != nil {
 			return fmt.Errorf("failed to undo mount bind on /etc/resolv.conf: %w", err)
 		}
 	} else {

@@ -6,9 +6,9 @@ import (
 	"locals/internal/dnsctl"
 	"locals/internal/mkcert"
 	"locals/internal/platform"
+	"locals/internal/service"
 	"log"
 	"path/filepath"
-	"strconv"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -46,10 +46,11 @@ func off(p platform.Platform, config *cfg.Config, wipe, dryrun bool) error {
 	if err := dnsctl.NewDNSController(p, config).Release(); err != nil {
 		return fmt.Errorf("failed to %sunconfigure DNS config: %w", qual, err)
 	}
-	if err := stopService(p, "dns", config); err != nil {
+	svctl := service.New(config.LocalsDir, config.TempDir, p.Env("PATH"), p.Stdout())
+	if err := stopService(svctl, "dns"); err != nil {
 		return fmt.Errorf("failed to %sstop embedded DNS server: %w", qual, err)
 	}
-	if err := stopService(p, "web", config); err != nil {
+	if err := stopService(svctl, "web"); err != nil {
 		return fmt.Errorf("failed to %sstop embedded web server: %w", qual, err)
 	}
 	if err := uninstallMkcert(p); err != nil {
@@ -76,25 +77,9 @@ func off(p platform.Platform, config *cfg.Config, wipe, dryrun bool) error {
 	return nil
 }
 
-func stopService(p platform.Platform, service string, config *cfg.Config) error {
-	pidFile := filepath.Join(config.LocalsDir, fmt.Sprintf("%s.pid", service))
-	pid := readPIDFromFile(p, pidFile)
-	if pid < 0 {
-		log.Printf("ℹ️ No %s PID file found. Nothing to kill.", service)
-		return nil
-	}
-
-	if p.Proc().IsProcessAlive(pid) {
-		if _, err := p.Proc().Run("sudo", "kill", strconv.Itoa(pid)); err != nil {
-			return fmt.Errorf("failed to stop locals %s (pid %d): %w", service, pid, err)
-		}
-		log.Printf("🛑 Terminated locals %s (PID: %d)", service, pid)
-	} else {
-		log.Printf("⚠️ PID file exists but process %d is already dead.", pid)
-	}
-
-	if _, err := p.Proc().Run("rm", pidFile); err != nil {
-		return fmt.Errorf("failed to remove %s PID file %q: %w", service, pidFile, err)
+func stopService(svctl service.Control, service string) error {
+	if err := svctl.Stop(service); err != nil {
+		return fmt.Errorf("failed to stop service %v: %w", service, err)
 	}
 	return nil
 }

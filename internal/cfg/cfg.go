@@ -5,4 +5,5 @@ type Config struct {
 	LocalsDir string
 	SystemCA  string
 	LocalsBin string
+	TempDir   string
 }

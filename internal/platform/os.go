@@ -1,8 +1,11 @@
 package platform
 
 import (
+	"fmt"
 	"io"
 	"os"
+	"os/exec"
+	"strings"
 )
 
 // Configuration paths and defaults for locals state under the user's config dir.
@@ -43,8 +46,13 @@ func (_ *osPlatform) FS() Filesystem {
 	return newOSFilesystem()
 }
 
-func (_ *osPlatform) Proc() Proc {
-	return &osProc{}
+func (_ *osPlatform) Run(cmd string, args ...string) (string, error) {
+	fullCmd := fullCmd(cmd, args...)
+	out, err := exec.Command(cmd, args...).CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("failed to run %s: %w\n%s", fullCmd, err, string(out))
+	}
+	return string(out), err
 }
 
 func (p *osPlatform) CheckDNSSetup(configDir string) *DNSStatus {
@@ -54,4 +62,8 @@ func (p *osPlatform) CheckDNSSetup(configDir string) *DNSStatus {
 // NewOSPlatform returns a platform implementation backed by the real OS.
 func NewOSPlatform() Platform {
 	return &osPlatform{stdout: os.Stdout, stderr: os.Stderr}
+}
+
+func fullCmd(cmd string, args ...string) string {
+	return strings.Join(append([]string{cmd}, args...), " ")
 }

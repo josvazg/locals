@@ -18,7 +18,6 @@ type Filesystem interface {
 	RemoveFiles(filenames ...string) error
 	ListFiles(globs ...string) ([]string, error)
 	PathExists(path string) bool
-	TempDir() string
 }
 
 type osFilesystem struct{}
@@ -105,10 +104,6 @@ func (osf *osFilesystem) ListFiles(globs ...string) ([]string, error) {
 
 func (osf *osFilesystem) Remove(filename string) error {
 	return os.Remove(filename)
-}
-
-func (_ *osFilesystem) TempDir() string {
-	return os.TempDir()
 }
 
 func Find(io Filesystem, filename, pattern string) (bool, error) {

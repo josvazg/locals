@@ -3,10 +3,12 @@ package cmds
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 
 	"locals/internal/platform"
+	"locals/internal/service"
 	"locals/internal/web"
 
 	"github.com/spf13/cobra"
@@ -19,24 +21,25 @@ func statusCmd(p platform.Platform, localsDir string) *cobra.Command {
 		Args:  cobra.ExactArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
-			return status(p, localsDir)
+			return status(p, localsDir, os.TempDir())
 		},
 	}
 }
 
-func status(p platform.Platform, configDir string) error {
+func status(p platform.Platform, configDir, tmpDir string) error {
 	fmt.Println("----------- 📍 Locals Status -----------")
 
 	dnsStatus := p.CheckDNSSetup(configDir)
 	fmt.Printf("DNS System:  %s\n", dnsStatus)
+	svctl := service.New(configDir, tmpDir, p.Env("PATH"), p.Stdout())
 
-	if isProcessAlive(p, filepath.Join(configDir, "dns.pid")) {
+	if svctl.IsRunning("dns") {
 		fmt.Println("DNS Service: 🟢 RUNNING")
 	} else {
 		fmt.Println("DNS Service: 🔴 OFF")
 	}
 
-	if isProcessAlive(p, filepath.Join(configDir, "web.pid")) {
+	if svctl.IsRunning("web") {
 		fmt.Println("Web Proxy:   🟢 RUNNING")
 		fmt.Println("\nActive web entrypoints:")
 	} else {
@@ -69,16 +72,4 @@ func status(p platform.Platform, configDir string) error {
 	}
 	fmt.Println("----------------------------------------")
 	return nil
-}
-
-func isProcessAlive(p platform.Platform, pidPath string) bool {
-	data, err := p.FS().ReadFile(pidPath)
-	if err != nil {
-		return false
-	}
-	var pid int
-	if _, err := fmt.Sscanf(string(data), "%d", &pid); err != nil {
-		return false
-	}
-	return p.Proc().IsProcessAlive(pid)
 }

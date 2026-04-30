@@ -18,20 +18,8 @@ func (dp *dryrunPlatform) FS() Filesystem {
 	return &dryrunIO{Filesystem: dp.Platform.FS()}
 }
 
-func (dp *dryrunPlatform) Proc() Proc {
-	return &dryrunProc{Proc: dp.Platform.Proc()}
-}
-
-type dryrunProc struct {
-	Proc
-}
-
-func (_ *dryrunProc) Run(cmd string, args ...string) (string, error) {
+func (dp *dryrunPlatform) Run(cmd string, args ...string) (string, error) {
 	return dryRun(cmd, args...)
-}
-
-func (_ *dryrunProc) Launch(cmd string, args ...string) (int, error) {
-	return dryrunLaunch(cmd, args...)
 }
 
 func dryRun(cmd string, args ...string) (string, error) {
