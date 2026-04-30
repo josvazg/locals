@@ -2,7 +2,8 @@ package cmds
 
 import (
 	"fmt"
-	"os/exec"
+	"locals/internal/mkcert"
+	"os"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -21,9 +22,9 @@ func envCmd() *cobra.Command {
 }
 
 func env() error {
-	caPath, err := exec.Command("mkcert", "-CAROOT").Output()
+	caPath, err := mkcert.New(os.Stdout).CARoot()
 	if err != nil {
-		return fmt.Errorf("failed to mkcert -CAROOT: %w", err)
+		return fmt.Errorf("failed to get mkcert env: %w", err)
 	}
 	cleanPath := strings.TrimSpace(string(caPath)) + "/rootCA.pem"
 	fmt.Printf("export SSL_CERT_FILE='%s'\n", cleanPath)

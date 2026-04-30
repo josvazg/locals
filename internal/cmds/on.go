@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"locals/internal/cfg"
 	"locals/internal/dnsctl"
+	"locals/internal/mkcert"
 	"locals/internal/platform"
 	"log"
 	"net"
@@ -103,11 +104,9 @@ func localsBinary(p platform.Platform, binary string) (string, error) {
 }
 
 func installMkcert(p platform.Platform) error {
-	out, err := p.Proc().Run("mkcert", "-install")
-	if err != nil {
+	if err := mkcert.New(p.Stdout()).Install(); err != nil {
 		return fmt.Errorf("failed to install mkcert: %w", err)
 	}
-	log.Print(out)
 	log.Printf("For CLI usage run:\nsource <(locals env)")
 	return nil
 }

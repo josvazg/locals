@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"locals/internal/cfg"
 	"locals/internal/dnsctl"
+	"locals/internal/mkcert"
 	"locals/internal/platform"
 	"log"
 	"path/filepath"
@@ -99,7 +100,7 @@ func stopService(p platform.Platform, service string, config *cfg.Config) error 
 }
 
 func uninstallMkcert(p platform.Platform) error {
-	if _, err := p.Proc().Run("mkcert", "-uninstall"); err != nil {
+	if err := mkcert.New(p.Stdout()).Uninstall(); err != nil {
 		errMsg := err.Error()
 		if strings.Contains(errMsg, "item could not be found in the keychain") ||
 			strings.Contains(errMsg, "not installed") {
