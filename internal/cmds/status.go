@@ -3,10 +3,13 @@ package cmds
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 
 	"locals/internal/platform"
+	"locals/internal/service"
+	"locals/internal/web"
 
 	"github.com/spf13/cobra"
 )
@@ -18,24 +21,25 @@ func statusCmd(p platform.Platform, localsDir string) *cobra.Command {
 		Args:  cobra.ExactArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
-			return status(p, localsDir)
+			return status(p, localsDir, os.TempDir())
 		},
 	}
 }
 
-func status(p platform.Platform, configDir string) error {
+func status(p platform.Platform, configDir, tmpDir string) error {
 	fmt.Println("----------- 📍 Locals Status -----------")
 
 	dnsStatus := p.CheckDNSSetup(configDir)
 	fmt.Printf("DNS System:  %s\n", dnsStatus)
+	svctl := service.New(configDir, tmpDir, p.Env("PATH"), p.Stdout())
 
-	if isProcessAlive(p, filepath.Join(configDir, "dns.pid")) {
+	if svctl.IsRunning("dns") {
 		fmt.Println("DNS Service: 🟢 RUNNING")
 	} else {
 		fmt.Println("DNS Service: 🔴 OFF")
 	}
 
-	if isProcessAlive(p, filepath.Join(configDir, "web.pid")) {
+	if svctl.IsRunning("web") {
 		fmt.Println("Web Proxy:   🟢 RUNNING")
 		fmt.Println("\nActive web entrypoints:")
 	} else {
@@ -44,7 +48,7 @@ func status(p platform.Platform, configDir string) error {
 	}
 
 	rulesDir := filepath.Join(configDir, "web")
-	files, _ := p.IO().ReadDir(rulesDir)
+	files, _ := p.FS().ReadDir(rulesDir)
 
 	count := 0
 	for _, f := range files {
@@ -52,8 +56,8 @@ func status(p platform.Platform, configDir string) error {
 			count++
 			name := strings.TrimSuffix(f.Name(), ".json")
 			target := "unknown"
-			if content, err := p.IO().ReadFile(filepath.Join(rulesDir, f.Name())); err == nil {
-				webConfig := WebConfig{}
+			if content, err := p.FS().ReadFile(filepath.Join(rulesDir, f.Name())); err == nil {
+				webConfig := web.Config{}
 				if err := json.Unmarshal(content, &webConfig); err == nil {
 					name = webConfig.URL
 					target = webConfig.Endpoint
@@ -68,16 +72,4 @@ func status(p platform.Platform, configDir string) error {
 	}
 	fmt.Println("----------------------------------------")
 	return nil
-}
-
-func isProcessAlive(p platform.Platform, pidPath string) bool {
-	data, err := p.IO().ReadFile(pidPath)
-	if err != nil {
-		return false
-	}
-	var pid int
-	if _, err := fmt.Sscanf(string(data), "%d", &pid); err != nil {
-		return false
-	}
-	return p.Proc().IsProcessAlive(pid)
 }

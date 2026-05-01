@@ -14,24 +14,12 @@ func NewDryrunPlatform(p Platform) Platform {
 	return &dryrunPlatform{p}
 }
 
-func (dp *dryrunPlatform) IO() FilesHandler {
-	return &dryrunIO{FilesHandler: dp.Platform.IO()}
+func (dp *dryrunPlatform) FS() Filesystem {
+	return &dryrunIO{Filesystem: dp.Platform.FS()}
 }
 
-func (dp *dryrunPlatform) Proc() Proc {
-	return &dryrunProc{Proc: dp.Platform.Proc()}
-}
-
-type dryrunProc struct {
-	Proc
-}
-
-func (_ *dryrunProc) Run(cmd string, args ...string) (string, error) {
+func (dp *dryrunPlatform) Run(cmd string, args ...string) (string, error) {
 	return dryRun(cmd, args...)
-}
-
-func (_ *dryrunProc) Launch(cmd string, args ...string) (int, error) {
-	return dryrunLaunch(cmd, args...)
 }
 
 func dryRun(cmd string, args ...string) (string, error) {
@@ -45,7 +33,7 @@ func dryrunLaunch(cmd string, args ...string) (int, error) {
 }
 
 type dryrunIO struct {
-	FilesHandler
+	Filesystem
 }
 
 func (dio *dryrunIO) CreateFile(filename, content string) error {

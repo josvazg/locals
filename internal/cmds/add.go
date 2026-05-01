@@ -2,6 +2,7 @@ package cmds
 
 import (
 	"fmt"
+	"locals/internal/mkcert"
 	"locals/internal/platform"
 	"log"
 	"path/filepath"
@@ -45,16 +46,15 @@ func addCmd(p platform.Platform, localsDir string) *cobra.Command {
 func add(p platform.Platform, localsDir, domain, targetURL string) error {
 	certFile := filepath.Join(localsDir, "certs", fmt.Sprintf("%s.pem", domain))
 	keyFile := filepath.Join(localsDir, "certs", fmt.Sprintf("%s-key.pem", domain))
-	out, err := p.Proc().Run("mkcert",
+	err := mkcert.New(p.Stdout()).Generate(
 		"-cert-file", certFile, "-key-file", keyFile,
 		domain, "*.locals", "localhost", "127.0.0.1")
 	if err != nil {
 		return fmt.Errorf("failed to setup certificates for domain %s: %w", domain, err)
 	}
-	log.Print(out)
 	domainCfgFile := filepath.Join(localsDir, "web", fmt.Sprintf("%s.json", domain))
 	domainCfgJSON := fmt.Sprintf(domainConfig, domain, targetURL, certFile, keyFile)
-	if err := p.IO().CreateFile(domainCfgFile, domainCfgJSON); err != nil {
+	if err := p.FS().CreateFile(domainCfgFile, domainCfgJSON); err != nil {
 		return fmt.Errorf("failed to setup web redirection for domain %s: %w", domain, err)
 	}
 	log.Printf("▶️ Added access to %s -> %s", domain, targetURL)

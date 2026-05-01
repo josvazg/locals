@@ -5,12 +5,12 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"locals/internal/platform"
+	"locals/internal/dns"
 	"log"
 	"net"
+	"os"
 	"strings"
 
-	"github.com/miekg/dns"
 	"github.com/spf13/cobra"
 )
 
@@ -22,9 +22,7 @@ const (
 	domainIP = "127.0.0.1"
 )
 
-var domainSuffix = fmt.Sprintf(".%s.", domain)
-
-func dnsCmd(ctx context.Context, p platform.Platform) *cobra.Command {
+func dnsCmd(ctx context.Context) *cobra.Command {
 	var logFile string
 	cmd := &cobra.Command{
 		Use:   "dns address [fallbacks]",
@@ -34,99 +32,49 @@ func dnsCmd(ctx context.Context, p platform.Platform) *cobra.Command {
 			"  locals dns 127.1.2.3 1.1.1.1,4.4.4.4,8.8.8.8,9.9.9.9",
 		Args: cobra.RangeArgs(1, 2),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			logger := log.Default()
 			if logFile != "" {
-				if err := setupLog(p, logFile); err != nil {
+				f, err := loggerFile(logFile)
+				if err != nil {
 					return fmt.Errorf("failed to setup log file: %w", err)
 				}
+				logger = log.New(f, "", log.LstdFlags)
+				defer f.Close()
 			}
 			listen := args[0]
-			fallbacks, err := fallbacks(p, args, listen)
+			fallbacks, err := fallbacks(args, listen)
 			if err != nil {
 				return err
 			}
 			cmd.SilenceUsage = true
-			return runDNS(ctx, listen, fallbacks)
+			return dns.New(listen, domain, domainIP, fallbacks, logger).Run(ctx)
 		},
 	}
 	cmd.Flags().StringVarP(&logFile, "log", "", "", "file to log to")
 	return cmd
 }
 
-func runDNS(ctx context.Context, listenAddr string, fallbacks []string) error {
-	handler := dns.HandlerFunc(handlerWithFallbacks(fallbacks))
-
-	server := &dns.Server{
-		Addr:    ensurePort(listenAddr),
-		Net:     "udp",
-		Handler: handler,
-	}
-
-	log.Printf("📡 DNS listening on %s (Fallbacks: %v)", listenAddr, fallbacks)
-	exitCtx, cancel := context.WithCancel(ctx)
-	go func() {
-		if err := server.ListenAndServe(); err != nil {
-			log.Printf("locals dns failed: %v", err)
-		}
-		log.Printf("locals dns exits")
-		cancel()
-	}()
-	<-exitCtx.Done()
-	log.Println("shutting down server...")
-	err := server.Shutdown()
+func loggerFile(logFile string) (*os.File, error) {
+	f, err := os.OpenFile(logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
-		log.Printf("dns shutdown Error: %v\n", err)
+		return nil, fmt.Errorf("failed open logger file: %w", err)
 	}
-	return nil
+	return f, nil
 }
 
-func handlerWithFallbacks(fallbacks []string) func(w dns.ResponseWriter, r *dns.Msg) {
-	return func(w dns.ResponseWriter, r *dns.Msg) {
-		m := new(dns.Msg)
-		m.SetReply(r)
-		m.Authoritative = true
-
-		for _, q := range r.Question {
-			if strings.HasSuffix(strings.ToLower(q.Name), domainSuffix) {
-				if q.Qtype == dns.TypeA {
-					rr, _ := dns.NewRR(fmt.Sprintf("%s 60 IN A %s", q.Name, domainIP))
-					m.Answer = append(m.Answer, rr)
-				}
-				w.WriteMsg(m)
-				return
-			}
-		}
-		c := new(dns.Client)
-		for _, addr := range fallbacks {
-			in, _, err := c.Exchange(r, ensurePort(addr))
-			if err == nil {
-				w.WriteMsg(in)
-				return
-			}
-		}
-		dns.HandleFailed(w, r)
-	}
-}
-
-func ensurePort(addr string) string {
-	if !strings.Contains(addr, ":") {
-		return net.JoinHostPort(addr, "53")
-	}
-	return addr
-}
-
-func fallbacks(p platform.Platform, args []string, listen string) ([]string, error) {
+func fallbacks(args []string, listen string) ([]string, error) {
 	if len(args) > 1 {
 		return strings.Split(args[1], ","), nil
 	}
-	allNameservers, err := nameservers(p, resolvConf)
+	allNameservers, err := nameservers(resolvConf)
 	if err != nil {
 		return nil, fmt.Errorf("failed to detect nameservers: %w", err)
 	}
 	return removeIfFound(allNameservers, listen), nil
 }
 
-func nameservers(p platform.Platform, path string) ([]string, error) {
-	contents, err := p.IO().ReadFile(path)
+func nameservers(path string) ([]string, error) {
+	contents, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}

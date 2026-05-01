@@ -6,6 +6,7 @@ import (
 	"crypto/x509"
 	"fmt"
 	"io"
+	"locals/internal/mkcert"
 	"locals/test/files"
 	"log"
 	"net/http"
@@ -49,7 +50,7 @@ func TestLocals(t *testing.T) {
 		fmt.Printf("%s:\n%v", filename, string(out))
 	}
 	testAdds(ctx, t, servers)
-	testServers(ctx, t, servers)
+	testServers(t, servers)
 	testRemovals(ctx, t, servers)
 	testOff(ctx, t)
 	testInactive(ctx, t)
@@ -123,9 +124,9 @@ func testAdds(ctx context.Context, t *testing.T, servers []*httptest.Server) {
 	testCmd(ctx, t, patchedAdded, "status")
 }
 
-func testServers(ctx context.Context, t *testing.T, servers []*httptest.Server) {
+func testServers(t *testing.T, servers []*httptest.Server) {
 	t.Helper()
-	client := testClient(ctx, t)
+	client := testClient(t)
 	defer client.CloseIdleConnections()
 	for _, server := range servers {
 		endpoint := server.Listener.Addr().String()
@@ -144,8 +145,8 @@ func testServers(ctx context.Context, t *testing.T, servers []*httptest.Server) 
 	}
 }
 
-func testClient(ctx context.Context, t *testing.T) *http.Client {
-	caPath := filepath.Join(mkcertCARoot(ctx, t), "rootCA.pem")
+func testClient(t *testing.T) *http.Client {
+	caPath := filepath.Join(mkcertCARoot(t), "rootCA.pem")
 	caCert, err := os.ReadFile(caPath)
 	require.NoError(t, err, "failed to read mkcert CA file")
 
@@ -215,12 +216,12 @@ func runLocals(ctx context.Context, args ...string) ([]byte, error) {
 	return cmd.CombinedOutput()
 }
 
-func mkcertCARoot(ctx context.Context, t *testing.T) string {
+func mkcertCARoot(t *testing.T) string {
 	t.Helper()
 
-	out, err := exec.CommandContext(ctx, "mkcert", "-CAROOT").Output()
+	caroot, err := mkcert.New(os.Stdout).CARoot()
 	require.NoError(t, err)
-	return strings.TrimSpace(string(out))
+	return strings.TrimSpace(caroot)
 }
 
 func envOrDefault(name, defaultValue string) string {

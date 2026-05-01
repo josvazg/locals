@@ -1,8 +1,11 @@
 package platform
 
 import (
+	"fmt"
 	"io"
 	"os"
+	"os/exec"
+	"strings"
 )
 
 // Configuration paths and defaults for locals state under the user's config dir.
@@ -14,33 +17,9 @@ const (
 	DefaultDNSListen = "127.1.2.3"
 )
 
-// Platform defines everything the tool needs from the operating system.
-// Swap these out to run the app in tests or with recorded behavior.
-type Platform interface {
-	SetStdout(stdout io.Writer)
-	SetStderr(stderr io.Writer)
-	Stdout() io.Writer
-	Stderr() io.Writer
-	Stdin() io.Reader
-	Env(name string) string
-	HomeDir() (string, error)
-	IO() FilesHandler
-	Proc() Proc
-	Run(name string, args ...string) (string, error)
-	CheckDNSSetup(configDir string) *DNSStatus
-}
-
 type osPlatform struct {
 	stdout io.Writer
 	stderr io.Writer
-}
-
-func (osp *osPlatform) SetStdout(stdout io.Writer) {
-	osp.stdout = stdout
-}
-
-func (osp *osPlatform) SetStderr(stderr io.Writer) {
-	osp.stderr = stderr
 }
 
 func (osp *osPlatform) Stdout() io.Writer {
@@ -63,23 +42,28 @@ func (_ *osPlatform) HomeDir() (string, error) {
 	return os.UserHomeDir()
 }
 
-func (_ *osPlatform) IO() FilesHandler {
-	return newOSFilesHandler()
-}
-
-func (_ *osPlatform) Proc() Proc {
-	return &osProc{}
+func (_ *osPlatform) FS() Filesystem {
+	return newOSFilesystem()
 }
 
 func (_ *osPlatform) Run(cmd string, args ...string) (string, error) {
-	return run(cmd, args...)
+	fullCmd := fullCmd(cmd, args...)
+	out, err := exec.Command(cmd, args...).CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("failed to run %s: %w\n%s", fullCmd, err, string(out))
+	}
+	return string(out), err
 }
 
 func (p *osPlatform) CheckDNSSetup(configDir string) *DNSStatus {
-	return checkDNSSetup(p.IO(), configDir)
+	return checkDNSSetup(p.FS(), configDir)
 }
 
 // NewOSPlatform returns a platform implementation backed by the real OS.
 func NewOSPlatform() Platform {
 	return &osPlatform{stdout: os.Stdout, stderr: os.Stderr}
+}
+
+func fullCmd(cmd string, args ...string) string {
+	return strings.Join(append([]string{cmd}, args...), " ")
 }
