@@ -2,27 +2,41 @@
 
 set -euo pipefail
 
-if command -v dnf >/dev/null; then
-	dnf install -y --skip-unavailable nix
-elif command -v apt-get >/dev/null; then
-    apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y nix
-elif command -v pacman >/dev/null; then
-    pacman -Syu --noconfirm nix
-elif command -v nix-env >/dev/null; then
-	nix-channel --add https://nixos.org/channels/nixpkgs-unstable nixpkgs
-    	nix-channel --update
-    	nix-env -iA nixpkgs.go nixpkgs.git nixpkgs.nss
-	export PATH="/root/.nix-profile/bin:/nix/var/nix/profiles/default/bin:$PATH"
+if [ ! -d /nix/store ]; then
+    mkdir -p /nix/store
+fi
+mount --bind /host-nix/store /nix/store
+
+"${HOST_NIX_PATH}/nix" --version
+export PATH="${HOST_NIX_PATH}:/bin:${PATH}"
+export NIX_STATE_DIR="/host-nix/var/nix"
+
+if [ ! -f /etc/ssl/certs/ca-certificates.crt ]; then
+    export NIX_SSL_CERT_FILE="/host-nix/var/nix/profiles/default/etc/ssl/certs/ca-bundle.crt"
 fi
 
+if ! command -v nix >/dev/null; then
+    echo "❌ Error: Nix binary not found. Check if /nix/store is mounted correctly."
+    exit 1
+fi
+
+# 3. Environment Compatibility
+# Some distros (like Fedora/Ubuntu) might need Nss for networking in Go
+export GODEBUG=netdns=go
+
+# 4. Execute from the mapped source
 cd /src
 
-export GODEBUG=netdns=go
-RUN_NIX_FLAKE=(nix --extra-experimental-features 'nix-command flakes' develop path:.)
+# We use --offline because we've shared the store from the host.
+# This prevents the container from trying to reach the internet for stuff 
+# that should already be on your SSD.
+RUN_NIX_FLAKE=(nix --extra-experimental-features 'nix-command flakes' develop path:. --offline)
+
 if [ $# -eq 0 ] || [ -z "$1" ]; then
-    echo "run shell"
+    echo "--- Entering Nix Develop Shell ---"
     "${RUN_NIX_FLAKE[@]}"
 else
-    echo "run command ${*}"
+    echo "--- Running command: ${*} ---"
     "${RUN_NIX_FLAKE[@]}" -c "$@"
 fi
+
