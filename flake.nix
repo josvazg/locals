@@ -22,10 +22,9 @@
             git
             curl
             unstable.go
-	    mkcert
-	    neovim
-	  ];
-
+	          mkcert
+	          neovim
+	        ];
           shellHook = ''
             export PATH=bin:$(go env GOPATH)/bin:$PATH
             export GOTOOLCHAIN=auto
