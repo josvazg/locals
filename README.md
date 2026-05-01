@@ -13,8 +13,8 @@ Locals is a lightweight developer tool designed to make local service developmen
 `locals` is aimed at **local development**. You should understand what it does before running it on a machine you care about.
 
 - **`locals on`** runs privileged steps via **`sudo`**: it starts the embedded DNS and HTTPS proxy as root (e.g. `nohup` + reserved ports), and it **changes how your OS resolves DNS** so `*.locals` queries hit Locals first.
-- **Linux**: may add a **`systemd-resolved`** drop-in (`/etc/systemd/resolved.conf.d/locals.conf`) and restart the service, or **bind-mount** a generated file over **`/etc/resolv.conf`** (the on-disk file is not edited; the mount is removed by `locals off` or a reboot, depending on setup). Locals also reads **`/etc/resolv.conf`** to pick upstream nameservers.
-- **macOS**: creates **`/etc/resolver/locals`** and adds a **`lo0`** interface alias so traffic can reach the DNS listener at **`127.1.2.3`**.
+- **Linux**: it will **bind-mount** a generated file over **`/etc/resolv.conf`**. The on-disk file is not edited; the mount is removed by `locals off` or a reboot, depending on setup. Locals also reads **`/etc/resolv.conf`** to pick upstream nameservers.
+- **MacOS**: creates **`/etc/resolver/locals`** and adds a **`lo0`** interface alias so traffic can reach the DNS listener at **`127.1.2.3`**.
 - **HTTPS proxy** listens on **`127.0.0.1:443` only** (loopback), not on all interfaces. `*.locals` DNS answers point at **`127.0.0.1`**, so browsers hit that address.
 
 Do not run this tool if you are unwilling to grant **`sudo`** for those operations. Review what `locals on` and `locals off` would run using **`--dryrun`** on the relevant subcommands if you are security-sensitive.
@@ -42,7 +42,7 @@ locals on
 
 Runs the background services (DNS and HTTPS proxy) and directs the OS to use Locals DNS first. This requires **`sudo`** where noted above.
 
-On **Linux**, the DNS override is implemented either via **systemd-resolved** routing for the `~locals` domain, or by **bind-mounting** a generated file onto **`/etc/resolv.conf`** so it nameservers **`127.1.2.3`** first. The real file under the mount is never modified by Locals directly.
+On **Linux**, the DNS override is implemented by **bind-mounting** a generated file onto **`/etc/resolv.conf`** so it nameservers **`127.1.2.3`** first. The real file under the mount is never modified by Locals directly.
 
 On **macOS**, Locals installs a resolver file so **`*.locals`** uses the Locals DNS server at **`127.1.2.3:53`**, and adds a **`lo0`** alias for **`127.1.2.3`**.
 
@@ -92,11 +92,15 @@ The module targets a **recent Go toolchain** (see **`go.mod`**). If your install
 
 ## Tested Operating Systems
 
+### Manually tested only
 - NixOS
-- macOS
-- Debian
+- MacOS
+
+### Included in Incus tests
+- Debian 
 - Ubuntu
 - Fedora
 - Arch
+- Void
 
 GitHub CI only tests **Ubuntu**. **macOS** is not exercised in CI but is intended to work when run locally. For other distros, an [Incus](https://linuxcontainers.org/incus/introduction/) setup on Linux can run **`mage -v testLinuxDistros`** (see `magefiles/mage.go`).
