@@ -26,7 +26,7 @@ func offCmd(p platform.Platform, localsDir string) *cobra.Command {
 				log.Printf("DRYRUN")
 				p = platform.NewDryrunPlatform(p)
 			}
-			config, err := newConfig(p, "", localsDir)
+			config, err := newConfig(p, "", localsDir, dryrun)
 			if err != nil {
 				return fmt.Errorf("failed to setup off config: %w", err)
 			}
@@ -46,7 +46,7 @@ func off(p platform.Platform, config *cfg.Config, wipe, dryrun bool) error {
 	if err := dnsctl.NewDNSController(p, config).Release(); err != nil {
 		return fmt.Errorf("failed to %sunconfigure DNS config: %w", qual, err)
 	}
-	svctl := service.New(config.LocalsDir, config.TempDir, p.Env("PATH"), p.Stdout())
+	svctl := service.New(config, p.Stdout())
 	if err := stopService(svctl, "dns"); err != nil {
 		return fmt.Errorf("failed to %sstop embedded DNS server: %w", qual, err)
 	}

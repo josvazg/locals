@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"path/filepath"
+	"strings"
 )
 
 type dryrunPlatform struct {
@@ -58,4 +59,8 @@ func (dio *dryrunIO) RemoveFiles(filenames ...string) error {
 		log.Printf("DRYRUN: would have removed file %q", filename)
 	}
 	return nil
+}
+
+func fullCmd(cmd string, args ...string) string {
+	return strings.Join(append([]string{cmd}, args...), " ")
 }

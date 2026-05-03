@@ -3,53 +3,80 @@
 package dnsctl
 
 import (
+	_ "embed"
 	"fmt"
 	"locals/internal/platform"
 	"log"
+	"regexp"
 )
 
 const (
-	resolverConf = "/etc/systemd/resolved.conf.d/locals.conf"
+	resolvConfPath = "/etc/resolv.conf"
 )
 
+//go:embed resolv.conf
+var LocalsResolvConfContents string
+
 func (d *osDNSController) Grab() error {
-	// use our replacement file as /etc/resolv.conf coul be a symlink,
-	// or mounted elsewhere
-	resolvConfLocal := platform.DNSConfigFile(d.cfg.LocalsDir)
-	resolvConfMounted, err := platform.Find(d.p.FS(), "/proc/self/mountinfo", resolvConfLocal)
+	active, err := active(d.p)
 	if err != nil {
-		return fmt.Errorf("failed to check for mountinfo: %w", err)
+		return fmt.Errorf("failed to check resolv.conf: %w", err)
 	}
-	if resolvConfMounted {
-		log.Printf("⚠️ /etc/resolv.conf already replaced. Skipping.")
+	if active {
+		log.Printf("⚠️ %s already replaced. Skipping.", resolvConfPath)
 		return nil
 	}
-	resolvCfg := fmt.Sprintf("nameserver %s\noptions edns0 trust-ad", d.cfg.DNSListen)
-	if err := d.p.FS().CreateFile(resolvConfLocal, resolvCfg); err != nil {
+
+	resolvConfLocal := dnsConfigFile(d.cfg.LocalsDir)
+	if err := d.p.FS().CreateFile(resolvConfLocal, resolveConfig(d.cfg.DNSListen)); err != nil {
 		return fmt.Errorf("failed to create alternate resolv.conf: %w", err)
 	}
-	if _, err := d.p.Run("sudo", "mount", "--bind", resolvConfLocal, "/etc/resolv.conf"); err != nil {
-		return fmt.Errorf("failed to bind mount /etc/resolv.conf: %w", err)
+	if _, err := d.p.Run("sudo", "mount", "--bind", resolvConfLocal, resolvConfPath); err != nil {
+		return fmt.Errorf("failed to bind mount %s: %w", resolvConfPath, err)
 	}
-	log.Printf("🔒 /etc/resolv.conf mounted to redirect DNS queries to locals dns first")
+	log.Printf("🔒 %s mounted to redirect DNS queries to locals dns first", resolvConfPath)
 	return nil
 }
 
 func (d *osDNSController) Release() error {
-	resolvConfLocal := platform.DNSConfigFile(d.cfg.LocalsDir)
-	resolvConfMounted, err := platform.Find(d.p.FS(), "/proc/self/mountinfo", resolvConfLocal)
+	active, err := active(d.p)
 	if err != nil {
-		return fmt.Errorf("failed to check for mountinfo: %w", err)
+		return fmt.Errorf("failed to check resolv.conf: %w", err)
 	}
-	if resolvConfMounted {
-		if _, err := d.p.Run("sudo", "umount", "/etc/resolv.conf"); err != nil {
+	if active {
+		if _, err := d.p.Run("sudo", "umount", resolvConfPath); err != nil {
 			return fmt.Errorf("failed to undo mount bind on /etc/resolv.conf: %w", err)
 		}
 	} else {
 		log.Printf("ℹ️ /etc/resolv.conf was not mounted.")
 	}
-	if err := d.p.FS().RemoveFiles(resolverConf); err != nil {
-		return fmt.Errorf("failed to remove resolved config: %w", err)
-	}
 	return nil
+}
+
+func active(p platform.Platform) (bool, error) {
+	r, err := regexp.Compile(resolveConfig(".*"))
+	if err != nil {
+		return false, fmt.Errorf("failed to compile resolv.conf contents pattern: %w", err)
+	}
+	activeResolvConf, err := p.FS().ReadFile(resolvConfPath)
+	if err != nil {
+		return false, fmt.Errorf("failed to read resolv.conf: %w", err)
+	}
+	return r.Match(activeResolvConf), nil
+}
+
+func Status(p platform.Platform, _ string) (*DNSStatus, error) {
+	dnsMode := "INACTIVE"
+	active, err := active(p)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check resolv.conf: %w", err)
+	}
+	if active {
+		dnsMode = "BIND-MOUNT ACTIVE"
+	}
+	return &DNSStatus{Active: active, Status: dnsMode}, nil
+}
+
+func resolveConfig(dnsListen string) string {
+	return fmt.Sprintf(LocalsResolvConfContents, dnsListen)
 }

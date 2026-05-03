@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"locals/internal/cfg"
 	"log"
 	"os"
 	"os/exec"
@@ -27,13 +28,18 @@ type Control interface {
 type ctl struct {
 	dir    string
 	tmpDir string
-	path   string
+	dryrun bool
 	l      *log.Logger
 }
 
-func New(dir, tmpDir, path string, sinkLog io.Writer) Control {
+func New(cfg *cfg.Config, sinkLog io.Writer) Control {
 	logger := log.New(sinkLog, "", log.LstdFlags)
-	return &ctl{dir: dir, tmpDir: tmpDir, path: path, l: logger}
+	return &ctl{
+		dir:    cfg.LocalsDir,
+		tmpDir: cfg.TempDir,
+		dryrun: cfg.Dryrun,
+		l:      logger,
+	}
 }
 
 func (c *ctl) Launch(service, cmd string, args ...string) (int, error) {
@@ -48,7 +54,11 @@ func (c *ctl) Launch(service, cmd string, args ...string) (int, error) {
 			return 0, fmt.Errorf("failed to remove PID file %q: %w", pidFile, err)
 		}
 	}
-	cmdArgs := append([]string{"env", fmt.Sprintf("PATH=%s", c.path), "nohup", cmd}, args...)
+	cmdArgs := append([]string{"nohup", cmd}, args...)
+	if c.dryrun {
+		c.l.Printf("DRYRUN: sudo %v", strings.Join(cmdArgs, " "))
+		return 0, nil
+	}
 	pid, err := c.launch("sudo", cmdArgs...)
 	if err != nil {
 		return 0, fmt.Errorf("failed to launch %v: %w", service, err)

@@ -6,7 +6,6 @@ package main
 import (
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -41,14 +40,7 @@ func Test() error {
 	mg.Deps(Build, Shellcheck)
 
 	fmt.Println("Running tests...")
-	cwd, err := os.Getwd()
-	if err != nil {
-		return fmt.Errorf("failed to get current working dir")
-	}
-	env := map[string]string{
-		"LOCALSBIN": filepath.Join(cwd, "bin", "locals"),
-	}
-	err = runVEnv(env, "go", "test", "-v", "-timeout", "2m", "./...")
+	err := sh.RunV("go", "test", "-v", "-timeout", "2m", "./...")
 	if err == nil {
 		fmt.Println("✅ Tests PASSED")
 	}
@@ -179,17 +171,6 @@ func waitForContainer(node string) {
 func Clean() error {
 	fmt.Println("Cleaning up...")
 	return sh.Rm("bin")
-}
-
-func runVEnv(env map[string]string, cmd string, args ...string) error {
-	var stdout, stderr io.Writer
-	if mg.Verbose() {
-		stdout = os.Stdout
-		stderr = os.Stderr
-		fmt.Printf("exec: %s %s", cmd, strings.Join(args, " "))
-	}
-	_, err := sh.Exec(env, stdout, stderr, cmd, args...)
-	return err
 }
 
 func expandFiles(globs []string) []string {

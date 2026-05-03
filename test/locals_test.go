@@ -38,7 +38,9 @@ func TestLocals(t *testing.T) {
 	servers := startTestServers(t, NumberOfTestServers)
 	defer stopTestServers(t, servers)
 	testSudo(ctx, t)
-	localsBinary = envOrDefault("LOCALSBIN", DefaultLocals)
+	bin, err := filepath.Abs(filepath.Join("..", "bin", DefaultLocals))
+	require.NoError(t, err)
+	localsBinary = bin
 	testInactive(ctx, t)
 	testStart(ctx, t)
 	testActive(ctx, t)
