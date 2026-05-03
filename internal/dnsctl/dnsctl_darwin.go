@@ -4,8 +4,10 @@ package dnsctl
 
 import (
 	_ "embed"
+	"errors"
 	"fmt"
 	"locals/internal/platform"
+	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -14,7 +16,7 @@ import (
 const (
 	resolverDir = "/etc/resolver"
 
-	resolverLocalsFile = resolverDir + "locals"
+	resolverLocalsFile = resolverDir + "/locals"
 )
 
 //go:embed locals
@@ -35,9 +37,8 @@ func (d *osDNSController) Grab() error {
 	if fileMatches {
 		return nil
 	}
-	resolverCfg := fmt.Sprintf("nameserver %s\nport 53\n", d.cfg.DNSListen)
-	tmpLocalsResolverFile := filepath.Join(d.cfg.TempDir, "locals-resolver.conf")
-	if err := d.p.FS().CreateFile(tmpLocalsResolverFile, resolverCfg); err != nil {
+	tmpLocalsResolverFile := filepath.Join(d.cfg.TempDir, "locals")
+	if err := d.p.FS().CreateFile(tmpLocalsResolverFile, resolverConfig(d.cfg.DNSListen)); err != nil {
 		return fmt.Errorf("failed to write resolver config: %w", err)
 	}
 	if _, err := d.p.Run("sudo", "cp", tmpLocalsResolverFile, resolverDir); err != nil {
@@ -50,7 +51,7 @@ func (d *osDNSController) Grab() error {
 }
 
 func (d *osDNSController) Release() error {
-	if !hasAlias(d.cfg.DNSListen) {
+	if hasAlias(d.cfg.DNSListen) {
 		if _, err := d.p.Run("sudo", "ifconfig", "lo0", "-alias", d.cfg.DNSListen); err != nil {
 			return fmt.Errorf("failed to remove lo0 DNS redirect: %w", err)
 		}
@@ -99,6 +100,9 @@ func fileMatches(p platform.Platform) (bool, error) {
 		return false, fmt.Errorf("failed to compile resolver contents pattern: %w", err)
 	}
 	activeResolverConfig, err := p.FS().ReadFile(resolverLocalsFile)
+	if errors.Is(err, os.ErrNotExist) {
+		return false, nil
+	}
 	if err != nil {
 		return false, fmt.Errorf("failed to read resolver config: %w", err)
 	}
