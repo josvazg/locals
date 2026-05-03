@@ -15,7 +15,7 @@ type Platform interface {
 	HomeDir() (string, error)
 	FS() Filesystem
 	Run(cmd string, args ...string) (string, error)
-	CheckDNSSetup(configDir string) *DNSStatus
+	Test(cmd string, args ...string) (string, error)
 }
 
 func IsIPOnInterface(ifaceName, targetIP string) bool {

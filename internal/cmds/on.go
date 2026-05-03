@@ -39,7 +39,7 @@ func onCmd(p platform.Platform, localsDir, binary string) *cobra.Command {
 				log.Printf("DRYRUN")
 				p = platform.NewDryrunPlatform(p)
 			}
-			config, err := newConfig(p, binary, localsDir)
+			config, err := newConfig(p, binary, localsDir, dryrun)
 			if err != nil {
 				return fmt.Errorf("failed to setup on config: %w", err)
 			}
@@ -50,7 +50,7 @@ func onCmd(p platform.Platform, localsDir, binary string) *cobra.Command {
 	return cmd
 }
 
-func newConfig(p platform.Platform, binary string, localsDir string) (*cfg.Config, error) {
+func newConfig(p platform.Platform, binary, localsDir string, dryrun bool) (*cfg.Config, error) {
 	localsBin := ""
 	if binary != "" {
 		bin, err := localsBinary(p, binary)
@@ -59,12 +59,17 @@ func newConfig(p platform.Platform, binary string, localsDir string) (*cfg.Confi
 		}
 		localsBin = bin
 	}
+	tmpDir := os.Getenv(cfg.EnvLocalsTempDir)
+	if tmpDir == "" {
+		tmpDir = os.TempDir()
+	}
 	config := cfg.Config{
 		DNSListen: platform.DefaultDNSListen,
 		LocalsDir: localsDir,
 		LocalsBin: localsBin,
 		SystemCA:  platform.SystemCA(p),
-		TempDir:   os.TempDir(),
+		TempDir:   tmpDir,
+		Dryrun:    dryrun,
 	}
 	return &config, nil
 }
@@ -77,7 +82,7 @@ func on(p platform.Platform, config *cfg.Config, dryrun bool) error {
 	if err := installMkcert(p); err != nil {
 		return fmt.Errorf("failed to %sinstall mkcert: %w", qual, err)
 	}
-	svctl := service.New(config.LocalsDir, config.TempDir, p.Env("PATH"), p.Stdout())
+	svctl := service.New(config, p.Stdout())
 	dnsServers, err := currentDNSServers(p)
 	if err != nil {
 		return fmt.Errorf("failed to detect fallback DNS servers: %w", err)
@@ -98,17 +103,27 @@ func on(p platform.Platform, config *cfg.Config, dryrun bool) error {
 }
 
 func localsBinary(p platform.Platform, binary string) (string, error) {
-	log.Printf("evaluating locals path: binary=%q", binary)
-	if p.FS().PathExists(binary) {
-		log.Printf("render binary: %q", binary)
-		return binary, nil
+	fullPath := binary
+	if !filepath.IsAbs(binary) {
+		var err error
+		if fullPath, err = filepath.Abs(binary); err != nil {
+			return "", fmt.Errorf("failed to expand binary path %q; %w", binary, err)
+		}
 	}
-	binPath, err := p.Run("command", "-v", "locals")
-	if err != nil {
-		return "", fmt.Errorf("failed to find locals binary path: %w", err)
+	if !p.FS().PathExists(fullPath) {
+		bin, err := p.Test("sh", "-c", "command -v locals")
+		if err != nil {
+			return "", fmt.Errorf("failed to infer binary path %q: %w\npath: %s",
+				binary, err, os.Getenv("PATH"))
+		}
+		bin = strings.TrimSpace(bin)
+		if !p.FS().PathExists(bin) {
+			return "", fmt.Errorf("failed to resolve a working binary path %q at path:\n%s",
+				fullPath, os.Getenv("PATH"))
+		}
+		fullPath = bin
 	}
-	log.Printf("resolved as binPath=%q", binPath)
-	return binPath, nil
+	return fullPath, nil
 }
 
 func installMkcert(p platform.Platform) error {
@@ -169,7 +184,7 @@ func isUsingSystemdResolved(p platform.Platform) bool {
 
 func launchWeb(svctl service.Control, config *cfg.Config) error {
 	webCfg := filepath.Join(config.LocalsDir, "web")
-	pid, err := svctl.Launch("web", 
+	pid, err := svctl.Launch("web",
 		config.LocalsBin, "web",
 		webCfg, "--log", filepath.Join(config.TempDir, "locals-web.log"))
 	if err != nil {

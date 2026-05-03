@@ -3,10 +3,11 @@ package cmds
 import (
 	"encoding/json"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 
+	"locals/internal/cfg"
+	"locals/internal/dnsctl"
 	"locals/internal/platform"
 	"locals/internal/service"
 	"locals/internal/web"
@@ -21,17 +22,25 @@ func statusCmd(p platform.Platform, localsDir string) *cobra.Command {
 		Args:  cobra.ExactArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
-			return status(p, localsDir, os.TempDir())
+			dryrun := false
+			config, err := newConfig(p, "", localsDir, dryrun)
+			if err != nil {
+				return fmt.Errorf("failed to setup on config: %w", err)
+			}
+			return status(p, config)
 		},
 	}
 }
 
-func status(p platform.Platform, configDir, tmpDir string) error {
+func status(p platform.Platform, cfg *cfg.Config) error {
 	fmt.Println("----------- 📍 Locals Status -----------")
 
-	dnsStatus := p.CheckDNSSetup(configDir)
+	dnsStatus, err := dnsctl.Status(p, cfg.DNSListen)
+	if err != nil {
+		return fmt.Errorf("failed to check dns status: %w", err)
+	}
 	fmt.Printf("DNS System:  %s\n", dnsStatus)
-	svctl := service.New(configDir, tmpDir, p.Env("PATH"), p.Stdout())
+	svctl := service.New(cfg, p.Stdout())
 
 	if svctl.IsRunning("dns") {
 		fmt.Println("DNS Service: 🟢 RUNNING")
@@ -47,7 +56,7 @@ func status(p platform.Platform, configDir, tmpDir string) error {
 		fmt.Println("\nConfigured web entrypoints:")
 	}
 
-	rulesDir := filepath.Join(configDir, "web")
+	rulesDir := filepath.Join(cfg.LocalsDir, "web")
 	files, _ := p.FS().ReadDir(rulesDir)
 
 	count := 0

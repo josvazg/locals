@@ -6,9 +6,6 @@ const (
 	DefaultSystemCA = "/etc/ssl/certs/ca-certificates.crt"
 
 	EnvDomain = "DOMAIN"
-
-	// EnvLocalsConfigDir overrides the default ~/.config/locals state directory.
-	EnvLocalsConfigDir = "LOCALS_CONFIG_DIR"
 )
 
 func SystemCA(p Platform) string {

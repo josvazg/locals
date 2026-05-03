@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"path/filepath"
 
+	"locals/internal/cfg"
 	"locals/internal/platform"
 
 	"github.com/spf13/cobra"
@@ -45,12 +46,12 @@ func Run(ctx context.Context, p platform.Platform, args []string) error {
 }
 
 func localsDir(p platform.Platform) (string, error) {
-	localsDir := p.Env(platform.EnvLocalsConfigDir)
+	localsDir := p.Env(cfg.EnvLocalsConfigDir)
 	if localsDir != "" {
 		return localsDir, nil
 	}
 	homeDir, err := p.HomeDir()
-	if err != nil && p.Env(platform.EnvLocalsConfigDir) == "" {
+	if err != nil && p.Env(cfg.EnvLocalsConfigDir) == "" {
 		return "", fmt.Errorf("locals failed : %w", err)
 	}
 	return filepath.Join(homeDir, platform.DirName), nil
