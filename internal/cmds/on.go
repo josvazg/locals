@@ -87,11 +87,11 @@ func on(p platform.Platform, config *cfg.Config, dryrun bool) error {
 	if err != nil {
 		return fmt.Errorf("failed to detect fallback DNS servers: %w", err)
 	}
-	if err := launchDNS(svctl, config, dnsServers); err != nil {
-		return fmt.Errorf("failed to %slaunch embedded DNS server: %w", qual, err)
-	}
 	if err := dnsctl.NewDNSController(p, config).Grab(); err != nil {
 		return fmt.Errorf("failed to %sconfigure system DNS: %w", qual, err)
+	}
+	if err := launchDNS(svctl, config, dnsServers); err != nil {
+		return fmt.Errorf("failed to %slaunch embedded DNS server: %w", qual, err)
 	}
 	if err := launchWeb(svctl, config); err != nil {
 		return fmt.Errorf("failed to %slaunch embedded Web server: %w", qual, err)
