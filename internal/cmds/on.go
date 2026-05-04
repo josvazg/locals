@@ -102,6 +102,11 @@ func on(p platform.Platform, config *cfg.Config, dryrun bool) error {
 	if err := dnsCtl.Grab(); err != nil {
 		return fmt.Errorf("failed to %sconfigure system DNS: %w", qual, err)
 	}
+	if !dryrun {
+		if err := retry(func() error { return probeSystemDNS(config.TempDir) }, probeRetries, probePause); err != nil {
+			return err
+		}
+	}
 	if err := launchWeb(svctl, config); err != nil {
 		return fmt.Errorf("failed to %slaunch embedded Web server: %w", qual, err)
 	}
@@ -234,6 +239,17 @@ func probeDNS(tmpDir string, dnsListen string) error {
 	_, _, err := c.Exchange(m, completeAddress(dnsListen, 53))
 	if err != nil {
 		return fmt.Errorf("probe failed, check failure at %s/locals-dns.log: %w", tmpDir, err)
+	}
+	return nil
+}
+
+func probeSystemDNS(tmpDir string) error {
+	addrs, err := net.LookupHost("probe.locals")
+	if err != nil {
+		return fmt.Errorf("system DNS probe failed, check failure at %s/locals-dns.log: %w", tmpDir, err)
+	}
+	if len(addrs) == 0 {
+		return fmt.Errorf("system DNS probe returned no addresses, check %s/locals-dns.log", tmpDir)
 	}
 	return nil
 }
