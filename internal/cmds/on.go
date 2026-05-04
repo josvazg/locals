@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"bytes"
 	"crypto/tls"
-	"errors"
 	"fmt"
 	"locals/internal/cfg"
 	"locals/internal/dnsctl"
@@ -19,6 +18,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/miekg/dns"
 	"github.com/spf13/cobra"
 )
 
@@ -87,11 +87,25 @@ func on(p platform.Platform, config *cfg.Config, dryrun bool) error {
 	if err != nil {
 		return fmt.Errorf("failed to detect fallback DNS servers: %w", err)
 	}
+	dnsCtl := dnsctl.NewDNSController(p, config)
+	if err := dnsCtl.Prepare(); err != nil {
+		return fmt.Errorf("failed to %sprepare DNS interface: %w", qual, err)
+	}
 	if err := launchDNS(svctl, config, dnsServers); err != nil {
 		return fmt.Errorf("failed to %slaunch embedded DNS server: %w", qual, err)
 	}
-	if err := dnsctl.NewDNSController(p, config).Grab(); err != nil {
+	if !dryrun {
+		if err := retry(func() error { return probeDNS(config.TempDir, config.DNSListen) }, probeRetries, probePause); err != nil {
+			return err
+		}
+	}
+	if err := dnsCtl.Grab(); err != nil {
 		return fmt.Errorf("failed to %sconfigure system DNS: %w", qual, err)
+	}
+	if !dryrun {
+		if err := retry(func() error { return probeSystemDNS(config.TempDir) }, probeRetries, probePause); err != nil {
+			return err
+		}
 	}
 	if err := launchWeb(svctl, config); err != nil {
 		return fmt.Errorf("failed to %slaunch embedded Web server: %w", qual, err)
@@ -99,7 +113,7 @@ func on(p platform.Platform, config *cfg.Config, dryrun bool) error {
 	if dryrun {
 		return nil
 	}
-	return probeServices(config.TempDir, config.DNSListen, ListenAddr)
+	return retry(func() error { return probeWeb(config.TempDir, ListenAddr) }, probeRetries, probePause)
 }
 
 func localsBinary(p platform.Platform, binary string) (string, error) {
@@ -207,13 +221,6 @@ func readPIDFromFile(p platform.Platform, pidFile string) int {
 	return pid
 }
 
-func probeServices(tmpDir string, dnsListen, webListen string) error {
-	return errors.Join(
-		retry(func() error { return probeDNS(tmpDir, dnsListen) }, probeRetries, probePause),
-		retry(func() error { return probeWeb(tmpDir, webListen) }, probeRetries, probePause),
-	)
-}
-
 func retry(f func() error, retries int, pause time.Duration) error {
 	var err error
 	for range retries {
@@ -226,12 +233,24 @@ func retry(f func() error, retries int, pause time.Duration) error {
 }
 
 func probeDNS(tmpDir string, dnsListen string) error {
-	d := net.Dialer{Timeout: 2 * time.Second}
-	conn, err := d.Dial("udp", completeAddress(dnsListen, 53))
+	c := &dns.Client{Timeout: 2 * time.Second}
+	m := new(dns.Msg)
+	m.SetQuestion("probe.locals.", dns.TypeA)
+	_, _, err := c.Exchange(m, completeAddress(dnsListen, 53))
 	if err != nil {
 		return fmt.Errorf("probe failed, check failure at %s/locals-dns.log: %w", tmpDir, err)
 	}
-	defer conn.Close()
+	return nil
+}
+
+func probeSystemDNS(tmpDir string) error {
+	addrs, err := net.LookupHost("probe.locals")
+	if err != nil {
+		return fmt.Errorf("system DNS probe failed, check failure at %s/locals-dns.log: %w", tmpDir, err)
+	}
+	if len(addrs) == 0 {
+		return fmt.Errorf("system DNS probe returned no addresses, check %s/locals-dns.log", tmpDir)
+	}
 	return nil
 }
 

@@ -22,14 +22,19 @@ const (
 //go:embed locals
 var LocalsResolverContents string
 
-func (d *osDNSController) Grab() error {
-	if !hasAlias(d.cfg.DNSListen) {
-		_, err := d.p.Run("sudo", "ifconfig", "lo0", "alias",
-			d.cfg.DNSListen, "netmask", "255.255.255.255")
-		if err != nil {
-			return fmt.Errorf("failed to set lo0 DNS redirect: %w", err)
-		}
+func (d *osDNSController) Prepare() error {
+	if hasAlias(d.cfg.DNSListen) {
+		return nil
 	}
+	_, err := d.p.Run("sudo", "ifconfig", "lo0", "alias",
+		d.cfg.DNSListen, "netmask", "255.255.255.255")
+	if err != nil {
+		return fmt.Errorf("failed to set lo0 DNS redirect: %w", err)
+	}
+	return nil
+}
+
+func (d *osDNSController) Grab() error {
 	fileMatches, err := fileMatches(d.p)
 	if err != nil {
 		return fmt.Errorf("failed to match resolver: %w", err)

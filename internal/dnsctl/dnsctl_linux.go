@@ -17,6 +17,10 @@ const (
 //go:embed resolv.conf
 var LocalsResolvConfContents string
 
+func (d *osDNSController) Prepare() error {
+	return nil
+}
+
 func (d *osDNSController) Grab() error {
 	active, err := active(d.p)
 	if err != nil {

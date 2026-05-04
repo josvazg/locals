@@ -6,6 +6,7 @@ import (
 	"crypto/x509"
 	"fmt"
 	"io"
+	"locals/internal/cfg"
 	"locals/internal/mkcert"
 	"locals/test/files"
 	"log"
@@ -31,7 +32,11 @@ const (
 	DefaultLocals = "locals"
 )
 
-var localsBinary = DefaultLocals
+var (
+	localsBinary  = DefaultLocals
+	testConfigDir string
+	testTempDir   string
+)
 
 func TestLocals(t *testing.T) {
 	ctx, _ := signal.NotifyContext(context.Background(), syscall.SIGTERM)
@@ -41,11 +46,31 @@ func TestLocals(t *testing.T) {
 	bin, err := filepath.Abs(filepath.Join("..", "bin", DefaultLocals))
 	require.NoError(t, err)
 	localsBinary = bin
+
+	testConfigDir = t.TempDir()
+	testTempDir = t.TempDir()
+
+	wasActive := isRealLocalsActive(ctx)
+	if wasActive {
+		out, err := runRealLocals(ctx, "off")
+		require.NoError(t, err, "failed to turn off running locals before test: %s", out)
+	}
+	// restore runs second (LIFO), after the test-daemon cleanup below
+	defer func() {
+		if wasActive {
+			if out, err := runRealLocals(ctx, "on"); err != nil {
+				t.Logf("warning: failed to restore locals after test: %v\n%s", err, out)
+			}
+		}
+	}()
+	// stop test daemons on any exit path, including mid-test failures
+	defer func() { runLocals(ctx, "off") }() //nolint:errcheck
+
 	testInactive(ctx, t)
 	testStart(ctx, t)
 	testActive(ctx, t)
 	for _, filename := range []string{"locals-dns.log", "locals-web.log"} {
-		out, err := os.ReadFile(filepath.Join(os.TempDir(), filename))
+		out, err := os.ReadFile(filepath.Join(testTempDir, filename))
 		if err != nil {
 			fmt.Printf("failed to read %q: %v", filename, err)
 		}
@@ -215,7 +240,24 @@ func testCmd(ctx context.Context, t *testing.T, want string, args ...string) {
 
 func runLocals(ctx context.Context, args ...string) ([]byte, error) {
 	cmd := exec.CommandContext(ctx, localsBinary, args...)
+	cmd.Env = append(os.Environ(),
+		cfg.EnvLocalsConfigDir+"="+testConfigDir,
+		cfg.EnvLocalsTempDir+"="+testTempDir,
+	)
 	return cmd.CombinedOutput()
+}
+
+func runRealLocals(ctx context.Context, args ...string) ([]byte, error) {
+	cmd := exec.CommandContext(ctx, localsBinary, args...)
+	return cmd.CombinedOutput()
+}
+
+func isRealLocalsActive(ctx context.Context) bool {
+	out, err := runRealLocals(ctx, "status")
+	if err != nil {
+		return false
+	}
+	return strings.Contains(string(out), "RUNNING")
 }
 
 func mkcertCARoot(t *testing.T) string {
