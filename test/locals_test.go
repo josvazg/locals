@@ -49,6 +49,7 @@ func TestLocals(t *testing.T) {
 
 	testConfigDir = t.TempDir()
 	testTempDir = t.TempDir()
+	os.Setenv("GODEBUG", "netdns=go")
 
 	wasActive := isRealLocalsActive(ctx)
 	if wasActive {
