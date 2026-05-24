@@ -12,8 +12,6 @@ import (
 	"fmt"
 	"log"
 	"math/big"
-	"net/http"
-	"net/http/httputil"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -31,7 +29,7 @@ type Server struct {
 	addr  string
 	dir   string
 	l     *log.Logger
-	store *proxyStore
+	store ProxyStore
 }
 
 type Config struct {
@@ -46,10 +44,7 @@ func New(addr, dir string, logger *log.Logger) *Server {
 		addr: addr,
 		dir:  dir,
 		l:    logger,
-		store: &proxyStore{
-			routes: make(map[string]*url.URL),
-			certs:  make(map[string]*tls.Certificate),
-		},
+		store: NewProxyStore(),
 	}
 }
 
@@ -58,13 +53,11 @@ func (s *Server) Run(ctx context.Context) error {
 		return fmt.Errorf("failed to load config: %w", err)
 	}
 
-	server := &http.Server{
-		Addr:    s.addr,
-		Handler: http.HandlerFunc(s.reverseProxy()),
-		TLSConfig: &tls.Config{
-			GetCertificate: s.getCertificate(),
-		},
+	hl, err := NewHybridListener(ctx, s.addr, s.store.Endpoint)
+	if err != nil {
+		return fmt.Errorf("failed to start loistener at %s: %w", s.addr, err)
 	}
+	proxy := NewHybridProxy(hl)
 
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
@@ -78,7 +71,7 @@ func (s *Server) Run(ctx context.Context) error {
 
 	s.l.Printf("🚀 Web Proxy listening on %s", s.addr)
 	go func() {
-		if err := server.ListenAndServeTLS("", ""); err != nil { // Certs are handled by GetCertificate
+		if err := proxy.Serve(hl); err != nil { // Certs are handled by GetCertificate
 			s.l.Printf("locals web proxy listen failed: %v", err)
 		}
 		s.l.Printf("locals web proxy server exits")
@@ -87,7 +80,7 @@ func (s *Server) Run(ctx context.Context) error {
 	s.l.Println("shutting down Web Proxy...")
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	if err := server.Shutdown(shutdownCtx); err != nil {
+	if err := proxy.Shutdown(shutdownCtx); err != nil {
 		s.l.Printf("locals web proxy shutdown failed: %v\n", err)
 	}
 	s.l.Println("locals web proxy stopped")
@@ -116,14 +109,17 @@ func (s *Server) loadConfig() error {
 		if err != nil {
 			return fmt.Errorf("parse endpoint for %s (%s): %w", cfg.URL, filename, err)
 		}
-
-		cert, err := tls.LoadX509KeyPair(cfg.CertFile, cfg.KeyFile)
-		if err != nil {
-			return fmt.Errorf("load cert for %s (%s): %w", cfg.URL, filename, err)
+		if cfg.CertFile == "" && cfg.KeyFile == "" {
+			s.store.AddTCPEndpoint(cfg.URL, target)
+			s.l.Printf("loaded config tcp://%s -> %s", cfg.URL, cfg.Endpoint)
+		} else {
+			cert, err := tls.LoadX509KeyPair(cfg.CertFile, cfg.KeyFile)
+			if err != nil {
+				return fmt.Errorf("load cert for %s (%s): %w", cfg.URL, filename, err)
+			}
+			s.store.AddTLSEndpoint(cfg.URL, target, &cert)
+			s.l.Printf("loaded config https://%s -> %s", cfg.URL, cfg.Endpoint)
 		}
-
-		s.store.AddEndpoint(cfg.URL, target, &cert)
-		s.l.Printf("loaded config https://%s -> %s", cfg.URL, cfg.Endpoint)
 		hosts[cfg.URL] = struct{}{}
 	}
 	for _, h := range s.store.ListHosts() {
@@ -137,12 +133,9 @@ func (s *Server) loadConfig() error {
 }
 
 func ensureProbeCert(store ProxyStore, hosts map[string]struct{}) error {
-	crt, err := store.Cert("probe")
-	if err != nil && !errors.Is(err, ErrNotFound) {
-		return fmt.Errorf("failed to check probe cert: %w", err)
-	}
-	if crt == nil {
-		store.AddEndpoint("probe", nil, newProbeCert())
+	endpoint := store.Endpoint("probe")
+	if endpoint == nil {
+		store.AddTLSEndpoint("probe", nil, newProbeCert())
 	}
 	hosts["probe"] = struct{}{}
 	return nil
@@ -186,37 +179,17 @@ func ensureProtocol(addr string) string {
 	return addr
 }
 
-func (s *Server) reverseProxy() func(http.ResponseWriter, *http.Request) {
-	return func(w http.ResponseWriter, r *http.Request) {
-		target, err := s.store.Endpoint(r.Host)
-		if err != nil {
-			if err == ErrNotFound {
-				http.Error(w, "Domain not found in locals", http.StatusNotFound)
-				return
-			}
-			s.l.Printf("failed to check SNI %q: %v", r.Host, err)
-			http.Error(w, "Error checking domain in locals", http.StatusInternalServerError)
-			return
-		}
-
-		proxy := httputil.NewSingleHostReverseProxy(target)
-
-		// Update headers so the backend sees the correct host
-		r.URL.Host = target.Host
-		r.URL.Scheme = target.Scheme
-		r.Header.Set("X-Forwarded-Host", r.Header.Get("Host"))
-
-		proxy.ServeHTTP(w, r)
-	}
-}
-
 func (s *Server) getCertificate() func(*tls.ClientHelloInfo) (*tls.Certificate, error) {
 	return func(hello *tls.ClientHelloInfo) (*tls.Certificate, error) {
-		if cert, err := s.store.Cert(hello.ServerName); err != nil {
-			return nil, fmt.Errorf("no certificate for %s: %w\n%v", hello.ServerName, err, s.store.ListHosts())
-		} else {
-			return cert, nil
+		endpoint := s.store.Endpoint(hello.ServerName)
+		if endpoint == nil {
+			return nil, fmt.Errorf("no endpoint for %s: %v", hello.ServerName, s.store.ListHosts())
 		}
+		if endpoint.TLSConfig == nil || len(endpoint.TLSConfig.Certificates) == 0 {
+			return nil, fmt.Errorf("no cert for %s", hello.ServerName)
+		}
+		cert := endpoint.TLSConfig.Certificates[0]
+		return &cert, nil
 	}
 }
 

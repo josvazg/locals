@@ -1,21 +1,29 @@
 package cmds
 
 import (
+	"crypto/tls"
 	"fmt"
 	"locals/internal/mkcert"
 	"locals/internal/platform"
 	"log"
+	"net"
 	"path/filepath"
+	"time"
 
 	"github.com/spf13/cobra"
 )
 
 const (
-	domainConfig = `{
+	serviceConfig = `{
   "url": "%s",
   "endpoint": "%s",
   "cert": "%s",
   "key": "%s"
+}`
+
+	pipeConfig = `{
+  "url": "%s",
+  "endpoint": "%s"
 }`
 )
 
@@ -44,6 +52,13 @@ func addCmd(p platform.Platform, localsDir string) *cobra.Command {
 }
 
 func add(p platform.Platform, localsDir, domain, targetURL string) error {
+	if IsHTTPS(targetURL) {
+		return addTCPPipe(p, localsDir, domain, targetURL)
+	}
+	return addTLSService(p, localsDir, domain, targetURL)
+}
+
+func addTLSService(p platform.Platform, localsDir, domain, targetURL string) error {
 	certFile := filepath.Join(localsDir, "certs", fmt.Sprintf("%s.pem", domain))
 	keyFile := filepath.Join(localsDir, "certs", fmt.Sprintf("%s-key.pem", domain))
 	err := mkcert.New(p.Stdout()).Generate(
@@ -53,10 +68,35 @@ func add(p platform.Platform, localsDir, domain, targetURL string) error {
 		return fmt.Errorf("failed to setup certificates for domain %s: %w", domain, err)
 	}
 	domainCfgFile := filepath.Join(localsDir, "web", fmt.Sprintf("%s.json", domain))
-	domainCfgJSON := fmt.Sprintf(domainConfig, domain, targetURL, certFile, keyFile)
+	domainCfgJSON := fmt.Sprintf(serviceConfig, domain, targetURL, certFile, keyFile)
 	if err := p.FS().CreateFile(domainCfgFile, domainCfgJSON); err != nil {
-		return fmt.Errorf("failed to setup web redirection for domain %s: %w", domain, err)
+		return fmt.Errorf("failed to setup HTTPS redirection for domain %s: %w", domain, err)
 	}
-	log.Printf("▶️ Added access to %s -> %s", domain, targetURL)
+	log.Printf("▶️ Added web TLS access to %s -> %s", domain, targetURL)
 	return nil
+}
+
+func addTCPPipe(p platform.Platform, localsDir, domain, targetURL string) error {
+	domainCfgFile := filepath.Join(localsDir, "web", fmt.Sprintf("%s.json", domain))
+	domainCfgJSON := fmt.Sprintf(pipeConfig, domain, targetURL)
+	if err := p.FS().CreateFile(domainCfgFile, domainCfgJSON); err != nil {
+		return fmt.Errorf("failed to setup HTTP redirection for domain %s: %w", domain, err)
+	}
+	log.Printf("▶️ Added web TCP pipe access to %s -> %s", domain, targetURL)
+	return nil
+}
+
+// IsHTTPS checks if a target address (e.g., "localhost:8443") is serving TLS.
+func IsHTTPS(address string) bool {
+	dialer := &net.Dialer{Timeout: 2 * time.Second}
+
+	config := &tls.Config{InsecureSkipVerify: true}
+
+	conn, err := tls.DialWithDialer(dialer, "tcp", address, config)
+	if err != nil {
+		return false
+	}
+	defer conn.Close()
+
+	return conn.ConnectionState().HandshakeComplete
 }

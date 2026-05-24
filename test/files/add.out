@@ -1,3 +1,1 @@
-.*
-Created a new certificate valid for the following names 📜
-.*
+.*(?s)Created a new certificate valid for the following names 📜|.*Added web TCP pipe access to.*(?s).*

@@ -2,14 +2,20 @@ package test
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/pem"
 	"fmt"
 	"io"
 	"locals/internal/cfg"
 	"locals/internal/mkcert"
 	"locals/test/files"
 	"log"
+	"math/big"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -17,17 +23,17 @@ import (
 	"os/signal"
 	"path/filepath"
 	"regexp"
-	"sort"
 	"strings"
 	"syscall"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 const (
-	NumberOfTestServers = 3
+	NumberOfTestServers = 5
 
 	DefaultLocals = "locals"
 )
@@ -86,22 +92,86 @@ func TestLocals(t *testing.T) {
 
 func startTestServers(t *testing.T, n int) []*httptest.Server {
 	servers := make([]*httptest.Server, 0, n)
-	for range n {
-		server := newTestServer(t)
-		log.Printf("started server at %s", server.Listener.Addr().String())
-		servers = append(servers, server)
+	for i := range n {
+		tls := (i%2 == 0)
+		servers = append(servers, newTestServer(t, serverName(i), tls))
 	}
 	return servers
 }
 
-func newTestServer(t *testing.T) *httptest.Server {
+func newTestServer(t *testing.T, serverName string, tls bool) *httptest.Server {
 	t.Helper()
 
-	addr := ":?"
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintf(w, "Hello from server at %s", addr)
-	}))
-	addr = server.Listener.Addr().String()
+	var server *httptest.Server
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintf(w, "Hello from server %s", serverName)
+	})
+
+	if tls {
+		server = newCustomTLSServer(t, handler, []string{serverName})
+	} else {
+		server = httptest.NewServer(handler)
+	}
+	return server
+}
+
+// newCustomTLSServer creates a TLS test server running with a self-signed
+// certificate valid for the explicitly provided hostnames/IPs (SANs).
+func newCustomTLSServer(t *testing.T, handler http.Handler, allowedNames []string) *httptest.Server {
+	t.Helper()
+
+	server := httptest.NewUnstartedServer(handler)
+
+	priv, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatalf("failed to generate private key: %v", err)
+	}
+
+	template := x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject: pkix.Name{
+			Organization: []string{"Go Test Server Inc."},
+			CommonName:   allowedNames[0], // Primary name
+		},
+		NotBefore:             time.Now(),
+		NotAfter:              time.Now().Add(1 * time.Hour), // Short-lived for testing
+		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+		BasicConstraintsValid: true,
+	}
+
+	// Categorize the allowed names into DNSNames or IPAddresses
+	for _, name := range allowedNames {
+		if ip := net.ParseIP(name); ip != nil {
+			template.IPAddresses = append(template.IPAddresses, ip)
+		} else {
+			template.DNSNames = append(template.DNSNames, name)
+		}
+	}
+
+	derBytes, err := x509.CreateCertificate(rand.Reader, &template, &template, &priv.PublicKey, priv)
+	if err != nil {
+		t.Fatalf("failed to create certificate: %v", err)
+	}
+
+	certPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: derBytes})
+
+	privBytes, err := x509.MarshalPKCS8PrivateKey(priv)
+	if err != nil {
+		t.Fatalf("failed to marshal private key: %v", err)
+	}
+	keyPEM := pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: privBytes})
+
+	serverCert, err := tls.X509KeyPair(certPEM, keyPEM)
+	if err != nil {
+		t.Fatalf("failed to load x509 key pair: %v", err)
+	}
+
+	server.TLS = &tls.Config{
+		Certificates: []tls.Certificate{serverCert},
+	}
+
+	server.StartTLS()
 	return server
 }
 
@@ -141,9 +211,9 @@ func testAdds(ctx context.Context, t *testing.T, servers []*httptest.Server) {
 	t.Helper()
 	serviceList := ""
 	addContent := loadFile(t, "add.out")
-	for _, server := range sortByPort(servers) {
+	for i, server := range servers {
 		endpoint := server.Listener.Addr().String()
-		url := serviceURL(portFrom(endpoint))
+		url := serverName(i)
 		serviceList = fmt.Sprintf("%s  🔗 %s -> %s\n", serviceList, url, endpoint)
 		testCmd(ctx, t, addContent, "add", url, endpoint)
 	}
@@ -154,11 +224,10 @@ func testAdds(ctx context.Context, t *testing.T, servers []*httptest.Server) {
 
 func testServers(t *testing.T, servers []*httptest.Server) {
 	t.Helper()
-	client := testClient(t)
+	client := testClient(t, servers)
 	defer client.CloseIdleConnections()
-	for _, server := range servers {
-		endpoint := server.Listener.Addr().String()
-		url := fmt.Sprintf("https://%s", serviceURL(portFrom(endpoint)))
+	for i := range len(servers) {
+		url := fmt.Sprintf("https://%s", serverName(i))
 		res, err := client.Get(url)
 		if err != nil {
 			require.NoError(t, err)
@@ -168,12 +237,12 @@ func testServers(t *testing.T, servers []*httptest.Server) {
 		if err != nil {
 			require.NoError(t, err)
 		}
-		want := fmt.Sprintf("Hello from server at %s", server.Listener.Addr())
+		want := fmt.Sprintf("Hello from server %s", serverName(i))
 		assert.Equal(t, want, string(greeting))
 	}
 }
 
-func testClient(t *testing.T) *http.Client {
+func testClient(t *testing.T, servers []*httptest.Server) *http.Client {
 	caPath := filepath.Join(mkcertCARoot(t), "rootCA.pem")
 	caCert, err := os.ReadFile(caPath)
 	require.NoError(t, err, "failed to read mkcert CA file")
@@ -183,6 +252,21 @@ func testClient(t *testing.T) *http.Client {
 		certPool = x509.NewCertPool()
 	}
 	certPool.AppendCertsFromPEM(caCert)
+	for _, server := range servers {
+		if server.TLS == nil {
+			continue
+		}
+		for _, chain := range server.TLS.Certificates {
+			if chain.Certificate == nil {
+				continue
+			}
+			for _, crt := range chain.Certificate {
+				cert, err := x509.ParseCertificate(crt)
+				require.NoError(t, err)
+				certPool.AddCert(cert)
+			}
+		}
+	}
 
 	return &http.Client{
 		Transport: &http.Transport{
@@ -196,27 +280,10 @@ func testClient(t *testing.T) *http.Client {
 func testRemovals(ctx context.Context, t *testing.T, servers []*httptest.Server) {
 	t.Helper()
 	addContent := loadFile(t, "rm.out")
-	for _, server := range sortByPort(servers) {
-		endpoint := server.Listener.Addr().String()
-		url := fmt.Sprintf("service-%s.locals", portFrom(endpoint))
+	for i := range servers {
+		url := serverName(i)
 		testCmd(ctx, t, addContent, "rm", url)
 	}
-}
-
-func portFrom(addr string) string {
-	parts := strings.Split(addr, ":")
-	return parts[len(parts)-1]
-}
-
-func serviceURL(port string) string {
-	return fmt.Sprintf("service-%s.locals", port)
-}
-
-func sortByPort(servers []*httptest.Server) []*httptest.Server {
-	sort.Slice(servers, func(i, j int) bool {
-		return servers[i].Listener.Addr().String() < servers[j].Listener.Addr().String()
-	})
-	return servers
 }
 
 func testOff(ctx context.Context, t *testing.T) {
@@ -275,4 +342,8 @@ func envOrDefault(name, defaultValue string) string {
 		value = defaultValue
 	}
 	return value
+}
+
+func serverName(i int) string {
+	return fmt.Sprintf("service-%c.locals", 'a'+byte(i))
 }

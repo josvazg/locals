@@ -7,52 +7,53 @@ import (
 )
 
 type proxyStore struct {
-	m      sync.RWMutex
-	routes map[string]*url.URL
-	certs  map[string]*tls.Certificate
+	m         sync.RWMutex
+	endpoints map[string]*Endpoint
 }
 
 type ProxyStore interface {
-	AddEndpoint(host string, url *url.URL, cert *tls.Certificate)
-	Endpoint(host string) (*url.URL, error)
-	Cert(host string) (*tls.Certificate, error)
+	AddTLSEndpoint(host string, url *url.URL, cert *tls.Certificate)
+	AddTCPEndpoint(host string, url *url.URL)
 	ListHosts() []string
+	Endpoint(host string) *Endpoint
 	DeleteEndpoint(host string)
 }
 
-func (s *proxyStore) AddEndpoint(host string, endpoint *url.URL, cert *tls.Certificate) {
+var TCPPipeNoCert = tls.Certificate{} // explicitly marks an entry as a tcp pipe
+
+func NewProxyStore() ProxyStore {
+	return &proxyStore{endpoints: make(map[string]*Endpoint)}
+}
+
+func (s *proxyStore) AddTLSEndpoint(host string, url *url.URL, cert *tls.Certificate) {
 	s.m.Lock()
 	defer s.m.Unlock()
-	s.routes[host] = endpoint
-	s.certs[host] = cert
+	s.endpoints[host] = &Endpoint{
+		URL: url,
+		TLSConfig: &tls.Config{
+			Certificates: []tls.Certificate{*cert},
+			MinVersion:   tls.VersionTLS12,
+		},
+	}
 }
 
-func (s *proxyStore) Endpoint(host string) (*url.URL, error) {
-	s.m.RLock()
-	defer s.m.RUnlock()
-	endpoint, ok := s.routes[host]
-	if !ok {
-		return nil, ErrNotFound
-	}
-	return endpoint, nil
+func (s *proxyStore) AddTCPEndpoint(host string, url *url.URL) {
+	s.m.Lock()
+	defer s.m.Unlock()
+	s.endpoints[host] = &Endpoint{URL: url}
 }
 
-func (s *proxyStore) Cert(host string) (*tls.Certificate, error) {
+func (s *proxyStore) Endpoint(host string) *Endpoint {
 	s.m.RLock()
 	defer s.m.RUnlock()
-	cert, ok := s.certs[host]
-	if !ok {
-		return nil, ErrNotFound
-	}
-	return cert, nil
-
+	return s.endpoints[host]
 }
 
 func (s *proxyStore) ListHosts() []string {
 	s.m.RLock()
 	defer s.m.RUnlock()
 	hosts := []string{}
-	for h := range s.certs {
+	for h := range s.endpoints {
 		hosts = append(hosts, h)
 	}
 	return hosts
@@ -61,6 +62,5 @@ func (s *proxyStore) ListHosts() []string {
 func (s *proxyStore) DeleteEndpoint(host string) {
 	s.m.Lock()
 	defer s.m.Unlock()
-	delete(s.routes, host)
-	delete(s.certs, host)
+	delete(s.endpoints, host)
 }
