@@ -25,6 +25,7 @@ func (s *DNSStatus) String() string {
 }
 
 type DNSController interface {
+	Prepare() error
 	Grab() error
 	Release() error
 }
